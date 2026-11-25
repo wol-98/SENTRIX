@@ -33,6 +33,7 @@ from app.auth.decorators import login_required
 from app.core.state import system_state
 from app.services.notifications import send_sms_alert
 from app.services.intelligence import run_ml_prediction
+from app.services.detection import evaluate_detection
 from app.services.incidents import (
     ensure_open_incident,
     resolve_open_incidents,
@@ -373,97 +374,44 @@ def get_monitor_data():
         else "Sensor data unavailable"
     )
 
-    alert_message = "SAFE"
+    now = time.time()
 
-    # Reset prototype response controls before evaluating alerts.
+    detection, last_ddos_time = evaluate_detection(
+        sensor_live=sensor_live,
+        gas_level=gas_level,
+        temperature=current_temperature,
+        motion_detected=motion_detected,
+        cpu_usage=cpu_usage,
+        last_ddos_time=last_ddos_time,
+        now=now,
+    )
+
+    alert_message = (
+        detection.alert_message
+        if detection
+        else "SAFE"
+    )
+
+    # Reset prototype response controls before applying detections.
     system_state["system_controls"] = {
         "sprinklers": False,
         "alarm": False,
         "door_lock": True,
-        "firewall": "Standard"
+        "firewall": "Standard",
     }
 
-    # --------------------------------------------------------
-    # FIRE AND GAS DETECTION
-    # --------------------------------------------------------
-
-    if sensor_live and gas_level > 1000:
-
-        alert_message = "DANGER: FIRE - DEFENSE ACTIVE"
-
-        system_state["system_controls"].update({
-            "sprinklers": True,
-            "door_lock": False,
-            "alarm": True
-        })
-
-    # --------------------------------------------------------
-    # RESOURCE ANOMALY / MALWARE HEURISTIC
-    # --------------------------------------------------------
-
-    elif (
-        sensor_live
-        and cpu_usage > 50
-        and current_temperature > 30
-        and gas_level < 500
-    ):
-
-        alert_message = "MALWARE: CRYPTO-MINER DETECTED"
-
-        system_state["system_controls"]["firewall"] = (
-            "PROCESS ALERT"
+    if detection:
+        system_state["system_controls"].update(
+            detection.control_updates
         )
 
-    # --------------------------------------------------------
-    # RESOURCE SPIKE HEURISTIC
-    # --------------------------------------------------------
+    event_type = detection.event_type if detection else None
 
-    elif (
-        cpu_usage > 40
-        or (time.time() - last_ddos_time < 5)
-    ):
-
-        if cpu_usage > 40:
-            last_ddos_time = time.time()
-
-        alert_message = (
-            "CRITICAL: RESOURCE SPIKE - "
-            "INVESTIGATION REQUIRED"
-        )
-
-        system_state["system_controls"]["firewall"] = (
-            "TRAFFIC REVIEW"
-        )
-
-    # --------------------------------------------------------
-    # MOTION / INTRUSION DETECTION
-    # -------------------------------------------------------
-
-    elif sensor_live and motion_detected == 1:
-
-        alert_message = "INTRUSION: MOTION DETECTED"
-
-        system_state["system_controls"]["alarm"] = True
-
-    # --------------------------------------------------------
-    # ALERT TRANSITION HANDLING
-    # --------------------------------------------------------
-
-
-
-    # --------------------------------------------------------
-    # PERSISTENT ALERT / INCIDENT HANDLING
-    # --------------------------------------------------------
-
-    event_type = ALERT_EVENT_TYPES.get(alert_message)
-
-    # When no alert is active, resolve previous open incidents.
-    if alert_message == "SAFE":
-
+    # Resolve previous alert incidents when no alert is active.
+    if detection is None:
         resolve_open_incidents(
             event_types=list(ALERT_EVENT_TYPES.values())
         )
-
     else:
         # Resolve any different alert that is no longer active.
         resolve_open_incidents(
@@ -471,57 +419,17 @@ def get_monitor_data():
             except_event_type=event_type,
         )
 
-        incident_details = {
-            "FIRE DETECTED": {
-                "value": f"Gas: {gas_level}",
-                "severity": "CRITICAL",
-                "description": (
-                    "Gas concentration exceeded the "
-                    "configured safety threshold."
-                ),
-            },
-            "MALWARE DETECTED": {
-                "value": (
-                    f"CPU: {cpu_usage}% | "
-                    f"Temp: {current_temperature} C"
-                ),
-                "severity": "CRITICAL",
-                "description": (
-                    "Possible cryptomining activity detected "
-                    "through abnormal CPU usage and temperature."
-                ),
-            },
-            "DDoS SUSPECTED": {
-                "value": f"CPU: {cpu_usage}%",
-                "severity": "HIGH",
-                "description": (
-                    "Abnormally high CPU usage detected. "
-                    "Possible resource exhaustion or "
-                    "network traffic anomaly."
-                ),
-            },
-            "INTRUSION DETECTED": {
-                "value": "Motion: 1",
-                "severity": "HIGH",
-                "description": (
-                    "Motion sensor detected unexpected movement."
-                ),
-            },
-        }
+        incident, created = ensure_open_incident(
+            event_type=detection.event_type,
+            value=detection.value,
+            severity=detection.severity,
+            description=detection.description,
+        )
 
-        details = incident_details.get(event_type)
+        # Send SMS only when a new incident was created.
+        if incident and created:
+            send_sms_alert(detection.alert_message)
 
-        if details:
-            incident, created = ensure_open_incident(
-                event_type=event_type,
-                value=details["value"],
-                severity=details["severity"],
-                description=details["description"],
-            )
-
-            # Send SMS only when a new incident was created.
-            if incident and created:
-                send_sms_alert(alert_message)
 
     # --------------------------------------------------------
     # UPDATE DASHBOARD METRICS
