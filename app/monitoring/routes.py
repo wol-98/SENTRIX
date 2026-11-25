@@ -34,6 +34,7 @@ from app.services.intelligence import run_ml_prediction
 from app.services.incidents import (
     ensure_open_incident,
     resolve_open_incidents,
+    sync_sensor_health_incident,
 )
 
 monitoring_bp = Blueprint("monitoring", __name__)
@@ -84,10 +85,27 @@ def get_monitor_data():
 
     system_state["sensor_health"] = {
         "status": sensor_status,
-        "age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
-        "last_seen": iot_metrics.get("last_update", "Waiting..."),
+        "age_seconds": (
+            round(age_seconds, 1)
+            if age_seconds is not None
+            else None
+        ),
+        "last_seen": iot_metrics.get(
+            "last_update",
+            "Waiting..."
+        ),
     }
 
+    sensor_incident, sensor_incident_created = (
+        sync_sensor_health_incident(
+            status=sensor_status,
+            age_seconds=age_seconds,
+            last_seen=iot_metrics.get(
+                "last_update",
+                "Waiting..."
+            ),
+        )
+    )
     prediction_message = (
         run_ml_prediction()
         if sensor_live

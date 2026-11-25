@@ -13,8 +13,13 @@ from werkzeug.security import generate_password_hash
 from app import create_app
 from app.core.state import system_state
 from app.extensions import db
-from app.models import SensorData
 import app.monitoring.routes as monitoring_routes
+
+from app.models import SensorData, IncidentLog
+from app.services.incidents import (
+    ensure_open_incident,
+    sync_sensor_health_incident,
+)
 
 from config import Config
 
@@ -669,6 +674,175 @@ class TestMonitoringBehavior(unittest.TestCase):
         sms.assert_called_once()
         incident.assert_called_once()
 
+# ============================================================
+# SENSOR HEALTH INCIDENT LIFECYCLE TESTS
+# ============================================================
+
+class TestSensorHealthIncidents(unittest.TestCase):
+    """Test real sensor-health incident lifecycle behavior."""
+
+    EVENT_TYPE = "SENSOR HEALTH"
+
+    def setUp(self):
+        with app.app_context():
+            db.create_all()
+
+    def tearDown(self):
+        with app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+    def get_open_sensor_incidents(self):
+        return IncidentLog.query.filter_by(
+            event_type=self.EVENT_TYPE,
+            status="OPEN",
+        ).all()
+
+    def test_stale_sensor_creates_medium_incident(self):
+        with app.app_context():
+            incident, created = sync_sensor_health_incident(
+                status="STALE",
+                age_seconds=30,
+                last_seen="Test",
+            )
+
+            self.assertTrue(created)
+            self.assertIsNotNone(incident)
+            self.assertEqual(incident.event_type, self.EVENT_TYPE)
+            self.assertEqual(incident.value, "STALE")
+            self.assertEqual(incident.severity, "MEDIUM")
+            self.assertEqual(incident.status, "OPEN")
+
+            self.assertEqual(
+                len(self.get_open_sensor_incidents()),
+                1,
+            )
+
+    def test_repeated_stale_status_does_not_duplicate_incident(self):
+        with app.app_context():
+            first_incident, first_created = (
+                sync_sensor_health_incident(
+                    status="STALE",
+                    age_seconds=30,
+                    last_seen="Test",
+                )
+            )
+
+            second_incident, second_created = (
+                sync_sensor_health_incident(
+                    status="STALE",
+                    age_seconds=35,
+                    last_seen="Test",
+                )
+            )
+
+            self.assertTrue(first_created)
+            self.assertFalse(second_created)
+
+            self.assertEqual(
+                first_incident.id,
+                second_incident.id,
+            )
+
+            self.assertEqual(
+                len(self.get_open_sensor_incidents()),
+                1,
+            )
+
+    def test_stale_incident_escalates_when_sensor_offline(self):
+        with app.app_context():
+            stale_incident, _ = sync_sensor_health_incident(
+                status="STALE",
+                age_seconds=30,
+                last_seen="Test",
+            )
+
+            offline_incident, created = (
+                sync_sensor_health_incident(
+                    status="OFFLINE",
+                    age_seconds=90,
+                    last_seen="Test",
+                )
+            )
+
+            self.assertFalse(created)
+
+            self.assertEqual(
+                stale_incident.id,
+                offline_incident.id,
+            )
+
+            self.assertEqual(offline_incident.value, "OFFLINE")
+            self.assertEqual(offline_incident.severity, "HIGH")
+            self.assertEqual(offline_incident.status, "OPEN")
+
+            self.assertEqual(
+                len(self.get_open_sensor_incidents()),
+                1,
+            )
+
+    def test_live_sensor_resolves_health_incident(self):
+        with app.app_context():
+            incident, _ = sync_sensor_health_incident(
+                status="OFFLINE",
+                age_seconds=90,
+                last_seen="Test",
+            )
+
+            sync_sensor_health_incident(
+                status="LIVE",
+                age_seconds=2,
+                last_seen="Test",
+            )
+
+            db.session.refresh(incident)
+
+            self.assertEqual(incident.status, "RESOLVED")
+            self.assertIsNotNone(incident.resolved_at)
+
+            self.assertEqual(
+                len(self.get_open_sensor_incidents()),
+                0,
+            )
+
+    def test_sensor_health_and_resource_incidents_coexist(self):
+        with app.app_context():
+            resource_incident, resource_created = (
+                ensure_open_incident(
+                    event_type="DDoS SUSPECTED",
+                    value="CPU: 45%",
+                    severity="HIGH",
+                    description="Resource spike detected.",
+                )
+            )
+
+            sensor_incident, sensor_created = (
+                sync_sensor_health_incident(
+                    status="STALE",
+                    age_seconds=30,
+                    last_seen="Test",
+                )
+            )
+
+            self.assertTrue(resource_created)
+            self.assertTrue(sensor_created)
+
+            self.assertIsNotNone(resource_incident)
+            self.assertIsNotNone(sensor_incident)
+
+            open_incidents = IncidentLog.query.filter_by(
+                status="OPEN",
+            ).all()
+
+            open_event_types = {
+                incident.event_type
+                for incident in open_incidents
+            }
+
+            self.assertIn("DDoS SUSPECTED", open_event_types)
+            self.assertIn(self.EVENT_TYPE, open_event_types)
+
+            self.assertEqual(len(open_incidents), 2)
 
 # ============================================================
 # TEST EXECUTION

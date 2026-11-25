@@ -164,3 +164,76 @@ def resolve_open_incidents(
         )
 
         return 0
+def sync_sensor_health_incident(
+    status,
+    age_seconds=None,
+    last_seen=None,
+):
+    """
+    Keep one sensor-health incident synchronized with
+    the current IoT sensor status.
+
+    STALE   -> MEDIUM
+    OFFLINE -> HIGH
+    LIVE    -> resolve the open sensor-health incident
+    """
+
+    status = str(status).upper()
+
+    event_type = "SENSOR HEALTH"
+
+    if status == "LIVE":
+        resolve_open_incidents([event_type])
+        return None, False
+
+    if status not in {"STALE", "OFFLINE"}:
+        return None, False
+
+    severity = {
+        "STALE": "MEDIUM",
+        "OFFLINE": "HIGH",
+    }[status]
+
+    if age_seconds is None:
+        age_description = "Sensor has not reported telemetry."
+    else:
+        age_description = (
+            f"Last telemetry received "
+            f"{age_seconds:.1f} seconds ago."
+        )
+
+    description = (
+        f"IoT sensor status: {status}. "
+        f"{age_description} "
+        f"Last seen: {last_seen or 'Unknown'}."
+    )
+
+    incident, created = ensure_open_incident(
+        event_type=event_type,
+        value=status,
+        severity=severity,
+        description=description,
+    )
+
+    if incident is None:
+        return None, False
+
+    # Update the existing incident when the sensor status
+    # changes, for example from STALE to OFFLINE.
+    incident.value = status
+    incident.severity = severity
+    incident.description = description
+    incident.updated_at = datetime.now()
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+        current_app.logger.exception(
+            "Failed to update sensor-health incident."
+        )
+
+        return None, False
+
+    return incident, created
