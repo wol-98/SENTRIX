@@ -6,7 +6,7 @@ from pathlib import Path
 from flask import Flask, render_template
 
 from config import Config
-from app.extensions import db, migrate
+from app.extensions import db, migrate, csrf
 from app.auth.decorators import login_required
 
 
@@ -20,6 +20,9 @@ def create_app(config_class=Config):
     )
 
     app.config.from_object(config_class)
+    config_class.validate(app.config)
+    # Protect browser-session forms against CSRF.
+    csrf.init_app(app)
 
     # Initialize extensions.
     db.init_app(app)
@@ -35,6 +38,8 @@ def create_app(config_class=Config):
     # Register telemetry blueprint.
     from app.telemetry.routes import telemetry_bp
     app.register_blueprint(telemetry_bp)
+    # Telemetry uses API-key authentication, not browser sessions.
+    csrf.exempt(telemetry_bp)
 
     # Register monitoring blueprint.
     from app.monitoring.routes import monitoring_bp

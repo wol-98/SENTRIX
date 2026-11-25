@@ -1,5 +1,7 @@
 
 """SENTRIX automated test suite."""
+
+import re
 import time
 import unittest
 from types import SimpleNamespace
@@ -24,6 +26,7 @@ class TestConfig(Config):
     """Isolated configuration for automated tests."""
 
     TESTING = True
+    WTF_CSRF_ENABLED = False
 
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -90,6 +93,49 @@ class TestSENTRIX(unittest.TestCase):
             db.session.remove()
             db.drop_all()
 
+    def test_login_rejects_missing_csrf_token(self):
+        app.config["WTF_CSRF_ENABLED"] = True
+
+        try:
+            response = self.client.post(
+                "/login",
+                data={
+                    "username": "testadmin",
+                    "password": "TestPassword123!",
+                },
+            )
+
+            self.assertEqual(response.status_code, 400)
+
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
+
+    def test_login_accepts_valid_csrf_token(self):
+        app.config["WTF_CSRF_ENABLED"] = True
+
+        try:
+            login_page = self.client.get("/login")
+
+            match = re.search(
+                r'<input[^>]*name="csrf_token"[^>]*value="([^"]+)"',
+                login_page.get_data(as_text=True),
+            )
+
+            self.assertIsNotNone(match, "CSRF token missing from login form")
+
+            response = self.client.post(
+                "/login",
+                data={
+                    "csrf_token": match.group(1),
+                    "username": "testadmin",
+                    "password": "TestPassword123!",
+                },
+            )
+
+            self.assertEqual(response.status_code, 302)
+
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
     # --------------------------------------------------------
     # AUTHORIZATION
     # --------------------------------------------------------
@@ -123,6 +169,8 @@ class TestSENTRIX(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+
+
     def test_telemetry_accepts_valid_api_key(self):
         payload = {
             "temperature": 24.5,
@@ -130,26 +178,30 @@ class TestSENTRIX(unittest.TestCase):
             "motion": 0
         }
 
-        response = self.client.post(
-            "/api/telemetry",
-            json=payload,
-            headers={
-                "X-API-Key": app.config["API_SECRET_KEY"]
-            }
-        )
+        app.config["WTF_CSRF_ENABLED"] = True
+
+        try:
+            response = self.client.post(
+                "/api/telemetry",
+                json=payload,
+                headers={
+                    "X-API-Key": app.config["API_SECRET_KEY"]
+                }
+            )
+
+        finally:
+            app.config["WTF_CSRF_ENABLED"] = False
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json["status"],
             "success"
         )
-
         with app.app_context():
             self.assertEqual(
                 SensorData.query.count(),
                 1
             )
-
     # --------------------------------------------------------
     # TEMPERATURE VALIDATION
     # --------------------------------------------------------

@@ -63,6 +63,7 @@
         <p style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 20px;">RESTRICTED AREA</p>
         
         <form action="/login" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" name="username" placeholder="Officer ID" required>
             <input type="password" name="password" placeholder="Passkey" required>
             <button type="submit">AUTHENTICATE</button>

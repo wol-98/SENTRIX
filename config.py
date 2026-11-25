@@ -40,7 +40,9 @@ class Config:
     DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
     @classmethod
-    def validate(cls):
+    def validate(cls, config=None):
+        settings = config if config is not None else vars(cls)
+
         required = [
             "SECRET_KEY",
             "API_SECRET_KEY",
@@ -50,7 +52,7 @@ class Config:
 
         missing = [
             name for name in required
-            if not getattr(cls, name)
+            if not settings.get(name)
         ]
 
         if missing:
