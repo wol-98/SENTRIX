@@ -15,7 +15,7 @@ from app.core.state import system_state
 from app.extensions import db
 import app.monitoring.routes as monitoring_routes
 
-from app.models import SensorData, IncidentLog
+from app.models import SensorData, IncidentLog, IncidentActivity
 from app.services.incidents import (
     ensure_open_incident,
     sync_sensor_health_incident,
@@ -843,6 +843,214 @@ class TestSensorHealthIncidents(unittest.TestCase):
             self.assertIn(self.EVENT_TYPE, open_event_types)
 
             self.assertEqual(len(open_incidents), 2)
+
+
+class TestIncidentResponse(unittest.TestCase):
+    """Test incident acknowledgement, investigation, and resolution."""
+
+    def setUp(self):
+        self.client = app.test_client()
+
+        with app.app_context():
+            db.create_all()
+
+            self.incident = IncidentLog(
+                event_type="PHASE2_TEST",
+                value="Test incident",
+                status="OPEN",
+                severity="MEDIUM",
+                description="Incident response route test.",
+            )
+            db.session.add(self.incident)
+            db.session.commit()
+
+            self.incident_id = self.incident.id
+
+        # Simulate an authenticated user.
+        with self.client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "testadmin"
+
+    def tearDown(self):
+        with app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+    def get_incident(self):
+        return db.session.get(IncidentLog, self.incident_id)
+
+    def get_activities(self):
+        return IncidentActivity.query.filter_by(
+            incident_id=self.incident_id
+        ).order_by(IncidentActivity.timestamp.asc()).all()
+
+    def test_acknowledge_open_incident(self):
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            incident = self.get_incident()
+
+            self.assertEqual(incident.status, "ACKNOWLEDGED")
+            self.assertEqual(incident.acknowledged_by, "testadmin")
+            self.assertIsNotNone(incident.acknowledged_at)
+
+            activities = self.get_activities()
+            self.assertEqual(len(activities), 1)
+            self.assertEqual(activities[0].action, "ACKNOWLEDGED")
+            self.assertEqual(activities[0].actor, "testadmin")
+
+    def test_cannot_acknowledge_incident_twice(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            self.assertEqual(
+                len(self.get_activities()),
+                1,
+            )
+
+    def test_add_investigation_note(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        note = "Test investigation finding."
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/notes",
+            data={"note": note},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            activities = self.get_activities()
+
+            self.assertEqual(len(activities), 2)
+            self.assertEqual(activities[1].action, "NOTE_ADDED")
+            self.assertEqual(activities[1].actor, "testadmin")
+            self.assertEqual(activities[1].note, note)
+
+    def test_reject_empty_investigation_note(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/notes",
+            data={"note": "   "},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            self.assertEqual(len(self.get_activities()), 1)
+
+    def test_cannot_add_note_to_open_incident(self):
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/notes",
+            data={"note": "Should not be accepted."},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            self.assertEqual(len(self.get_activities()), 0)
+
+    def test_resolve_acknowledged_incident(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        reason = "Test resolution reason."
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/resolve",
+            data={"reason": reason},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            incident = self.get_incident()
+
+            self.assertEqual(incident.status, "RESOLVED")
+            self.assertEqual(incident.resolved_by, "testadmin")
+            self.assertEqual(incident.resolution_note, reason)
+            self.assertIsNotNone(incident.resolved_at)
+
+            activities = self.get_activities()
+            self.assertEqual(len(activities), 2)
+            self.assertEqual(activities[1].action, "RESOLVED")
+            self.assertEqual(activities[1].actor, "testadmin")
+            self.assertEqual(activities[1].note, reason)
+
+    def test_reject_resolving_open_incident(self):
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/resolve",
+            data={"reason": "Attempted resolution."},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            incident = self.get_incident()
+
+            self.assertEqual(incident.status, "OPEN")
+            self.assertIsNone(incident.resolved_at)
+            self.assertEqual(len(self.get_activities()), 0)
+
+    def test_reject_resolution_without_reason(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/resolve",
+            data={"reason": "   "},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            incident = self.get_incident()
+
+            self.assertEqual(incident.status, "ACKNOWLEDGED")
+            self.assertIsNone(incident.resolved_at)
+            self.assertEqual(len(self.get_activities()), 1)
+
+    def test_cannot_add_note_after_resolution(self):
+        self.client.post(
+            f"/incidents/{self.incident_id}/acknowledge"
+        )
+        self.client.post(
+            f"/incidents/{self.incident_id}/resolve",
+            data={"reason": "Resolved for test."},
+        )
+
+        response = self.client.post(
+            f"/incidents/{self.incident_id}/notes",
+            data={"note": "This should be rejected."},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with app.app_context():
+            incident = self.get_incident()
+
+            self.assertEqual(incident.status, "RESOLVED")
+            self.assertEqual(len(self.get_activities()), 2)
 
 # ============================================================
 # TEST EXECUTION
