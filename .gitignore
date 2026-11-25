@@ -15,3 +15,21 @@ __pycache__/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local environment and secrets
+.venv/
+.env
+.env.*
+!.env.example
+
+# Local databases and application data
+instance/*.db
+*.sqlite
+*.sqlite3
+
+# Testing and development
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
