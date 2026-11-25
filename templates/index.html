@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cyber-Physical SOC</title>
+    <title>SENTRIX</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -51,6 +51,10 @@
         .metric-item { text-align: center; background: #0f172a; padding: 15px 5px; border-radius: 8px; flex: 1; }
         .metric-label { display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
         .metric-value { font-family: 'Roboto Mono', monospace; font-size: 1.2rem; font-weight: 700; }
+        .sensor-health { display: flex; align-items: center; gap: 8px; margin: -3px 0 14px; color: var(--text-secondary); font-size: 0.75rem; font-family: 'Roboto Mono', monospace; }
+        .sensor-health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-danger); }
+        .sensor-live .sensor-health-dot { background: var(--accent-safe); box-shadow: 0 0 7px var(--accent-safe); }
+        .sensor-stale .sensor-health-dot { background: var(--accent-warn); }
 
         /* AI BOX */
         .ai-box { background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid var(--neon-blue); font-size: 0.85rem; line-height: 1.4; display: flex; align-items: center; }
@@ -78,7 +82,7 @@
 <body>
 
     <div class="header">
-       <h1><i class="fa-solid fa-shield-halved" style="color: var(--neon-blue);"></i> Cyber-Physical SOC</h1>
+       <h1><i class="fa-solid fa-shield-halved" style="color: var(--neon-blue);"></i> SENTRIX</h1>
        <div class="subtitle">Integrated IT/OT Security Operations Center</div>
         
         <div class="connection-status">
@@ -105,6 +109,10 @@
                 <div class="card-header">
                     <i class="fa-solid fa-temperature-high" style="color: var(--accent-warn);"></i>
                     <span class="card-title">Environment</span>
+                </div>
+                <div id="sensor-health" class="sensor-health sensor-offline">
+                    <span class="sensor-health-dot"></span>
+                    <span id="sensor-health-text">SENSOR OFFLINE</span>
                 </div>
                 <div class="metrics-row">
                     <div class="metric-item"><span class="metric-label">TEMP</span><span class="metric-value" style="color: var(--accent-warn);"><span id="temp">--</span>°C</span></div>
@@ -171,18 +179,36 @@
         const tempChart = new Chart(ctxTemp, { type: 'line', data: { labels: [], datasets: [{ label: 'Temp', borderColor: '#f59e0b', backgroundColor: gradientTemp, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: false, grid: { color: '#334155' } }, x: { display: false } } } });
         const cpuChart = new Chart(ctxCpu, { type: 'line', data: { labels: [], datasets: [{ label: 'CPU', borderColor: '#3b82f6', backgroundColor: gradientCpu, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: true, max: 100 }, x: { display: false } } } });
 
+        let lastTemperatureEpoch = null;
+
         async function fetchData() {
             try {
                 const response = await fetch('/api/monitor');
                 if (!response.ok) throw new Error("Server Error");
                 const data = await response.json();
 
-                document.getElementById('conn-text').innerText = "LIVE DATA"; document.getElementById('conn-dot').className = "status-dot status-online";
-                document.getElementById('temp').innerText = data.iot_metrics.temperature;
-                document.getElementById('gas').innerText = data.iot_metrics.gas_level;
-                
+                document.getElementById('conn-text').innerText = "MONITOR ONLINE"; document.getElementById('conn-dot').className = "status-dot status-online";
+
+                const sensorHealth = data.sensor_health || { status: "OFFLINE" };
+                const healthStatus = sensorHealth.status || "OFFLINE";
+                const healthElement = document.getElementById('sensor-health');
+                healthElement.className = "sensor-health sensor-" + healthStatus.toLowerCase();
+                document.getElementById('sensor-health-text').innerText =
+                    "SENSOR " + healthStatus +
+                    (sensorHealth.age_seconds != null ? " · " + sensorHealth.age_seconds + "s ago" : "");
+
+                const sensorLive = healthStatus === "LIVE";
+                document.getElementById('temp').innerText = sensorLive ? data.iot_metrics.temperature : "--";
+                document.getElementById('gas').innerText = sensorLive ? data.iot_metrics.gas_level : "--";
+
                 const mot = document.getElementById('motion');
-                if(data.iot_metrics.motion == 1) { mot.innerHTML = "<span style='color:#ef4444'>DETECTED</span>"; } else { mot.innerHTML = "<span style='color:#10b981'>NONE</span>"; }
+                if (!sensorLive) {
+                    mot.innerText = "--";
+                } else if(data.iot_metrics.motion == 1) {
+                    mot.innerHTML = "<span style='color:#ef4444'>DETECTED</span>";
+                } else {
+                    mot.innerHTML = "<span style='color:#10b981'>NONE</span>";
+                }
 
                 document.getElementById('cpu').innerText = data.security_metrics.cpu_usage;
                 document.getElementById('ram').innerText = data.security_metrics.ram_usage;
@@ -214,8 +240,15 @@
 
                 // Update Graphs
                 const timeNow = new Date().toLocaleTimeString();
-                if(tempChart.data.labels.length > 20) tempChart.data.labels.shift(); tempChart.data.labels.push(timeNow);
-                if(tempChart.data.datasets[0].data.length > 20) tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[0].data.push(data.iot_metrics.temperature); tempChart.update();
+                const readingEpoch = data.iot_metrics.last_update_epoch;
+                if (sensorLive && readingEpoch != null && readingEpoch !== lastTemperatureEpoch) {
+                    if(tempChart.data.labels.length > 20) tempChart.data.labels.shift();
+                    if(tempChart.data.datasets[0].data.length > 20) tempChart.data.datasets[0].data.shift();
+                    tempChart.data.labels.push(data.iot_metrics.last_update || timeNow);
+                    tempChart.data.datasets[0].data.push(data.iot_metrics.temperature);
+                    lastTemperatureEpoch = readingEpoch;
+                    tempChart.update();
+                }
                 if(cpuChart.data.labels.length > 20) cpuChart.data.labels.shift(); cpuChart.data.labels.push(timeNow);
                 if(cpuChart.data.datasets[0].data.length > 20) cpuChart.data.datasets[0].data.shift(); cpuChart.data.datasets[0].data.push(data.security_metrics.cpu_usage); cpuChart.update();
 

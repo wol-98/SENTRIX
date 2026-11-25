@@ -1,10 +1,14 @@
 import requests
 import time
 import random
+from config import Config
 
 # SERVER URL
 URL = "http://127.0.0.1:5001/api/telemetry"
-HEADERS = {"X-API-Key": "Sentinel-X99-Secure-Token"}
+if not Config.API_SECRET_KEY:
+    raise RuntimeError("API_SECRET_KEY is missing from .env")
+
+HEADERS = {"X-API-Key": Config.API_SECRET_KEY}
 
 print("🤖 SMART AI SIMULATION STARTED (THREAT SIMULATION)")
 print("--------------------------------")
