@@ -38,6 +38,7 @@
         #alert-box { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: 700; text-align: center; font-family: 'Roboto Mono', monospace; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
         .safe-state { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-safe); color: var(--accent-safe); }
         .danger-state { background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-danger); color: var(--accent-danger); animation: pulse 1.5s infinite; }
+        .sensor-warning { background-color: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warn); color: var(--accent-warn); }
 
         /* GRID LAYOUT */
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
@@ -253,9 +254,31 @@
                 if(cpuChart.data.datasets[0].data.length > 20) cpuChart.data.datasets[0].data.shift(); cpuChart.data.datasets[0].data.push(data.security_metrics.cpu_usage); cpuChart.update();
 
                 // Alert Logic
-                const alertBox = document.getElementById('alert-box'); const rawStatus = data.security_metrics.alert_status;
-                if (rawStatus.includes("SAFE")) { alertBox.className = "safe-state"; alertBox.innerHTML = '<i class="fa-solid fa-check-circle"></i> SYSTEM STATUS: SECURE'; }
-                else { alertBox.className = "danger-state"; let icon = '<i class="fa-solid fa-triangle-exclamation"></i>'; if(rawStatus.includes("FIRE")) icon = '<i class="fa-solid fa-fire"></i>'; if(rawStatus.includes("DDoS")) icon = '<i class="fa-solid fa-shield-virus"></i>'; alertBox.innerHTML = `${icon} ${rawStatus}`; }
+                const alertBox = document.getElementById('alert-box');
+                const rawStatus = data.security_metrics.alert_status;
+
+                if (rawStatus.includes("SAFE") && healthStatus !== "LIVE") {
+                    alertBox.className = "sensor-warning";
+                    alertBox.innerHTML =
+                        '<i class="fa-solid fa-triangle-exclamation"></i> ' +
+                        `SENSOR ${healthStatus} — SECURITY MONITORING ACTIVE`;
+                } else if (rawStatus.includes("SAFE")) {
+                    alertBox.className = "safe-state";
+                    alertBox.innerHTML =
+                        '<i class="fa-solid fa-check-circle"></i> SYSTEM STATUS: SECURE';
+                } else {
+                    alertBox.className = "danger-state";
+
+                    let icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                    if (rawStatus.includes("FIRE")) {
+                        icon = '<i class="fa-solid fa-fire"></i>';
+                    }
+                    if (rawStatus.includes("DDoS")) {
+                        icon = '<i class="fa-solid fa-shield-virus"></i>';
+                    }
+
+                    alertBox.innerHTML = `${icon} ${rawStatus}`;
+                }
 
             } catch (error) { console.error("Error:", error); document.getElementById('conn-text').innerText = "DISCONNECTED"; document.getElementById('conn-dot').className = "status-dot status-offline"; }
         }
