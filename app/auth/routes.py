@@ -34,6 +34,7 @@ def login():
         if password_is_valid:
             session.clear()
             session["logged_in"] = True
+            session["username"] = username
             session.permanent = True
 
             return redirect(url_for("home"))

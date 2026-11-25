@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,6 +23,14 @@
 
         * { box-sizing: border-box; }
 
+        .ref-link {
+            color: #93c5fd;
+            text-decoration: none;
+        }
+
+        .ref-link:hover {
+         text-decoration: underline;
+        }
         body {
             margin: 0;
             padding: 24px;
@@ -223,6 +232,11 @@
             background: rgba(239, 68, 68, 0.16);
         }
 
+        .acknowledged {
+            color: #bfdbfe;
+            background: rgba(59, 130, 246, 0.16);
+        }
+
         .medium {
             color: #fde68a;
             background: rgba(245, 158, 11, 0.16);
@@ -324,6 +338,10 @@
                 <option value="OPEN" {% if status == "OPEN" %}selected{% endif %}>
                     Open
                 </option>
+                <option value="ACKNOWLEDGED"
+                   {% if status == "ACKNOWLEDGED" %}selected{% endif %}>
+                   Acknowledged
+                </option>
                 <option value="RESOLVED" {% if status == "RESOLVED" %}selected{% endif %}>
                     Resolved
                 </option>
@@ -375,7 +393,14 @@
                             {{ incident.timestamp.strftime("%Y-%m-%d %H:%M:%S") if incident.timestamp else "—" }}
                         </td>
 
-                        <td class="ref">{{ incident.incident_ref }}</td>
+                        <td class="ref">
+                    <a
+                     href="{{ url_for('monitoring.incident_detail', incident_id=incident.id) }}"
+                                 class="ref-link"
+                            >
+                                 {{ incident.incident_ref }}
+                            </a>
+                       </td>
 
                         <td>{{ incident.event_type }}</td>
 
@@ -408,7 +433,7 @@
     </section>
 
     <footer>
-        SENTRIX Security Operations Center · Incident records are read-only
+        SENTRIX Security Operations Center · Incident response actions are audit logged
     </footer>
 
 </div>

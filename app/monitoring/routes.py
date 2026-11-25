@@ -3,8 +3,9 @@
 
 from io import BytesIO
 from datetime import datetime
+from app.extensions import db
 
-from flask import send_file, current_app, render_template, request
+from flask import send_file, current_app, render_template, request, url_for, redirect, flash, session
 from sqlalchemy import or_
 
 from reportlab.lib import colors
@@ -21,7 +22,7 @@ from reportlab.platypus import (
     PageBreak,
 )
 
-from app.models import IncidentLog
+from app.models import IncidentLog, IncidentActivity
 
 import time
 
@@ -112,6 +113,206 @@ def incident_console():
         search=search,
         filtered_count=filtered_count,
     )
+
+@monitoring_bp.route("/incidents/<int:incident_id>", methods=["GET"])
+@login_required
+def incident_detail(incident_id):
+    """Display the details and activity history of an incident."""
+
+    incident = IncidentLog.query.get_or_404(incident_id)
+
+    activities = (
+        IncidentActivity.query
+        .filter_by(incident_id=incident.id)
+        .order_by(IncidentActivity.timestamp.desc())
+        .all()
+    )
+
+    return render_template(
+        "incident_detail.html",
+        incident=incident,
+        activities=activities,
+    )
+
+@monitoring_bp.route(
+    "/incidents/<int:incident_id>/acknowledge",
+    methods=["POST"],
+)
+@login_required
+def acknowledge_incident(incident_id):
+    """Acknowledge an open incident and record the action."""
+
+    incident = IncidentLog.query.get_or_404(incident_id)
+
+    if incident.status != "OPEN":
+        flash("Only open incidents can be acknowledged.", "warning")
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    actor = session.get("username", "admin")
+    now = datetime.now()
+
+    incident.status = "ACKNOWLEDGED"
+    incident.acknowledged_at = now
+    incident.acknowledged_by = actor
+
+    activity = IncidentActivity(
+        incident_id=incident.id,
+        action="ACKNOWLEDGED",
+        actor=actor,
+        note="Incident acknowledged for investigation.",
+        timestamp=now,
+    )
+
+    db.session.add(activity)
+    db.session.commit()
+
+    flash("Incident acknowledged successfully.", "success")
+
+    return redirect(
+        url_for(
+            "monitoring.incident_detail",
+            incident_id=incident.id,
+        )
+    )
+
+
+@monitoring_bp.route(
+    "/incidents/<int:incident_id>/notes",
+    methods=["POST"],
+)
+@login_required
+def add_incident_note(incident_id):
+    incident = IncidentLog.query.get_or_404(incident_id)
+
+    # Investigation notes are allowed only while investigating.
+    if incident.status != "ACKNOWLEDGED":
+        flash(
+            "Investigation notes can only be added to acknowledged incidents.",
+            "warning",
+        )
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    note = request.form.get("note", "").strip()
+
+    if not note:
+        flash("Please enter an investigation note.", "warning")
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    if len(note) > 5000:
+        flash("Investigation notes must be 5000 characters or fewer.", "warning")
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    actor = session.get("username", "admin")
+    now = datetime.now()
+
+    activity = IncidentActivity(
+        incident_id=incident.id,
+        action="NOTE_ADDED",
+        actor=actor,
+        note=note,
+        timestamp=now,
+    )
+
+    db.session.add(activity)
+    db.session.commit()
+
+    flash("Investigation note added.", "success")
+    return redirect(
+        url_for(
+            "monitoring.incident_detail",
+            incident_id=incident.id,
+        )
+    )
+
+
+@monitoring_bp.route(
+    "/incidents/<int:incident_id>/resolve",
+    methods=["POST"],
+)
+@login_required
+def resolve_incident(incident_id):
+    incident = IncidentLog.query.get_or_404(incident_id)
+
+    # Only acknowledged incidents can be resolved.
+    if incident.status != "ACKNOWLEDGED":
+        flash(
+            "Only acknowledged incidents can be resolved.",
+            "warning",
+        )
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    reason = request.form.get("reason", "").strip()
+
+    if not reason:
+        flash("A resolution reason is required.", "warning")
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    if len(reason) > 5000:
+        flash("The resolution reason must be 5000 characters or fewer.", "warning")
+        return redirect(
+            url_for(
+                "monitoring.incident_detail",
+                incident_id=incident.id,
+            )
+        )
+
+    actor = session.get("username", "admin")
+    now = datetime.now()
+
+    incident.status = "RESOLVED"
+    incident.resolved_at = now
+    incident.resolved_by = actor
+    incident.resolution_note = reason
+
+    activity = IncidentActivity(
+        incident_id=incident.id,
+        action="RESOLVED",
+        actor=actor,
+        note=reason,
+        timestamp=now,
+    )
+
+    db.session.add(activity)
+    db.session.commit()
+
+    flash("Incident resolved successfully.", "success")
+    return redirect(
+        url_for(
+            "monitoring.incident_detail",
+            incident_id=incident.id,
+        )
+    )
+
 @monitoring_bp.route("/api/monitor", methods=["GET"])
 @login_required
 def get_monitor_data():
