@@ -1,4 +1,5 @@
 
+
 """SENTRIX automated test suite."""
 
 import re
@@ -434,11 +435,21 @@ class TestMonitoringBehavior(unittest.TestCase):
     # MONITORING TEST HELPER
     # --------------------------------------------------------
 
-    def monitor(self, cpu=10, ram=30):
-        """Request monitoring with simulated system metrics."""
+    def monitor(
+        self,
+        cpu=10,
+        ram=30,
+        sensor_age=0,
+        no_sensor_timestamp=False,
+    ):
+        """Request monitoring with simulated system and sensor metrics."""
 
-        # Ensure the test sensor is LIVE.
-        system_state["iot_metrics"]["last_update_epoch"] = time.time()
+        if no_sensor_timestamp:
+            system_state["iot_metrics"]["last_update_epoch"] = None
+        else:
+            system_state["iot_metrics"]["last_update_epoch"] = (
+                time.time() - sensor_age
+            )
 
         with (
             patch(
@@ -452,7 +463,7 @@ class TestMonitoringBehavior(unittest.TestCase):
             patch(
                 "app.monitoring.routes.run_ml_prediction",
                 return_value="Thermal Stability Normal"
-            ),
+            ) as prediction_mock,
             patch(
                 "app.monitoring.routes.send_sms_alert"
             ) as sms_mock,
@@ -466,7 +477,7 @@ class TestMonitoringBehavior(unittest.TestCase):
         ):
             response = self.client.get("/api/monitor")
 
-        return response, sms_mock, incident_mock
+        return response, sms_mock, incident_mock, prediction_mock
     # --------------------------------------------------------
     # FIRE DETECTION
     # --------------------------------------------------------
@@ -474,7 +485,7 @@ class TestMonitoringBehavior(unittest.TestCase):
     def test_fire_detection(self):
         system_state["iot_metrics"]["gas_level"] = 1200
 
-        response, sms, incident = self.monitor()
+        response, sms, incident, prediction = self.monitor()
 
         self.assertEqual(response.status_code, 200)
 
@@ -502,7 +513,7 @@ class TestMonitoringBehavior(unittest.TestCase):
             "gas_level": 200
         })
 
-        response, sms, incident = self.monitor(cpu=60)
+        response, sms, incident, prediction = self.monitor(cpu=60)
 
         self.assertIn(
             "MALWARE",
@@ -522,7 +533,7 @@ class TestMonitoringBehavior(unittest.TestCase):
     # --------------------------------------------------------
 
     def test_resource_spike_detection(self):
-        response, sms, incident = self.monitor(cpu=45)
+        response, sms, incident, prediction = self.monitor(cpu=45)
 
         self.assertIn(
             "RESOURCE SPIKE",
@@ -544,7 +555,7 @@ class TestMonitoringBehavior(unittest.TestCase):
     def test_motion_intrusion_detection(self):
         system_state["iot_metrics"]["motion"] = 1
 
-        response, sms, incident = self.monitor()
+        response, sms, incident, prediction = self.monitor()
 
         self.assertIn(
             "INTRUSION",
@@ -571,7 +582,7 @@ class TestMonitoringBehavior(unittest.TestCase):
     # --------------------------------------------------------
 
     def test_safe_monitoring_state(self):
-        response, sms, incident = self.monitor()
+        response, sms, incident, prediction = self.monitor()
 
         self.assertEqual(
             response.json["security_metrics"]["alert_status"],
@@ -589,6 +600,75 @@ class TestMonitoringBehavior(unittest.TestCase):
         sms.assert_not_called()
         incident.assert_not_called()
 
+    # --------------------------------------------------------
+    # SENSOR HEALTH LIFECYCLE
+    # --------------------------------------------------------
+
+    def test_sensor_health_live(self):
+        response, sms, incident, prediction = self.monitor(
+            sensor_age=5
+        )
+        self.assertEqual(response.json["sensor_health"]["status"], "LIVE")
+        prediction.assert_called_once()
+
+    def test_sensor_health_stale(self):
+        response, sms, incident, prediction = self.monitor(
+            sensor_age=30
+        )
+        self.assertEqual(response.json["sensor_health"]["status"], "STALE")
+        prediction.assert_not_called()
+
+    def test_sensor_health_offline(self):
+        response, sms, incident, prediction = self.monitor(
+            sensor_age=90
+        )
+        self.assertEqual(response.json["sensor_health"]["status"], "OFFLINE")
+        prediction.assert_not_called()
+
+    def test_sensor_without_timestamp_is_offline(self):
+        response, sms, incident, prediction = self.monitor(
+            no_sensor_timestamp=True
+        )
+        self.assertEqual(response.json["sensor_health"]["status"], "OFFLINE")
+        prediction.assert_not_called()
+
+    # --------------------------------------------------------
+    # STALE SENSOR ALERT SUPPRESSION
+    # --------------------------------------------------------
+
+    def test_stale_sensor_does_not_trigger_fire_alert(self):
+        system_state["iot_metrics"]["gas_level"] = 1200
+        response, sms, incident, prediction = self.monitor(sensor_age=30)
+        self.assertEqual(
+            response.json["security_metrics"]["alert_status"], "SAFE"
+        )
+        sms.assert_not_called()
+        incident.assert_not_called()
+        prediction.assert_not_called()
+
+    def test_stale_sensor_does_not_trigger_motion_alert(self):
+        system_state["iot_metrics"]["motion"] = 1
+        response, sms, incident, prediction = self.monitor(sensor_age=30)
+        self.assertEqual(
+            response.json["security_metrics"]["alert_status"], "SAFE"
+        )
+        sms.assert_not_called()
+        incident.assert_not_called()
+        prediction.assert_not_called()
+
+    def test_resource_spike_detected_when_sensor_stale(self):
+        response, sms, incident, prediction = self.monitor(
+            cpu=45, sensor_age=30
+        )
+        self.assertIn(
+            "RESOURCE SPIKE",
+            response.json["security_metrics"]["alert_status"]
+        )
+        self.assertEqual(response.json["sensor_health"]["status"], "STALE")
+        prediction.assert_not_called()
+        sms.assert_called_once()
+        incident.assert_called_once()
+
 
 # ============================================================
 # TEST EXECUTION
@@ -596,3 +676,4 @@ class TestMonitoringBehavior(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
