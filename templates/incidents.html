@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTRIX | Incident Console</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --blue: #3b82f6;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, sans-serif;
+        }
+
+        .page {
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0;
+            font: 700 1.8rem "Roboto Mono", monospace;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-top: 8px;
+            font-size: 0.9rem;
+        }
+
+        .nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            background: var(--card);
+            text-decoration: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .button.primary {
+            background: var(--blue);
+            border-color: var(--blue);
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .metric {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .metric-value {
+            display: block;
+            margin-top: 10px;
+            font: 700 1.8rem "Roboto Mono", monospace;
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: end;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            flex: 1;
+            min-width: 160px;
+        }
+
+        label {
+            color: var(--muted);
+            font-size: 0.75rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px 12px;
+            color: var(--text);
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font: inherit;
+        }
+
+        .table-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table-heading h2 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .result-count {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        th {
+            color: var(--muted);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(15, 23, 42, 0.45);
+        }
+
+        td {
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        tbody tr:hover {
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .ref {
+            font: 0.75rem "Roboto Mono", monospace;
+            color: #93c5fd;
+            overflow-wrap: anywhere;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .critical, .high, .open {
+            color: #fecaca;
+            background: rgba(239, 68, 68, 0.16);
+        }
+
+        .medium {
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.16);
+        }
+
+        .low, .resolved {
+            color: #a7f3d0;
+            background: rgba(16, 185, 129, 0.16);
+        }
+
+        .description {
+            max-width: 320px;
+            color: #cbd5e1;
+            overflow-wrap: anywhere;
+        }
+
+        .empty {
+            padding: 48px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        footer {
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-align: center;
+        }
+
+        @media (max-width: 700px) {
+            body { padding: 14px; }
+            h1 { font-size: 1.4rem; }
+            .summary { grid-template-columns: repeat(2, 1fr); }
+            .metric { padding: 14px; }
+            .metric-value { font-size: 1.4rem; }
+        }
+    </style>
+</head>
+
+<body>
+<div class="page">
+
+    <header>
+        <div>
+            <h1>🛡 SENTRIX</h1>
+            <div class="subtitle">Incident Management Console</div>
+        </div>
+
+        <nav class="nav">
+            <a class="button" href="/">← Dashboard</a>
+            <a class="button primary" href="/api/report">Download PDF Report</a>
+        </nav>
+    </header>
+
+    <section class="summary">
+        <div class="metric">
+            <span class="metric-label">Total Incidents</span>
+            <span class="metric-value">{{ summary.total }}</span>
+        </div>
+
+        <div class="metric">
+            <span class="metric-label">Open</span>
+            <span class="metric-value" style="color: var(--red);">
+                {{ summary.open }}
+            </span>
+        </div>
+
+        <div class="metric">
+            <span class="metric-label">Resolved</span>
+            <span class="metric-value" style="color: var(--green);">
+                {{ summary.resolved }}
+            </span>
+        </div>
+
+        <div class="metric">
+            <span class="metric-label">Critical</span>
+            <span class="metric-value" style="color: var(--red);">
+                {{ summary.critical }}
+            </span>
+        </div>
+    </section>
+
+    <form class="filters" method="GET" action="/incidents">
+        <div class="field">
+            <label for="q">Search incidents</label>
+            <input
+                id="q"
+                name="q"
+                type="search"
+                placeholder="Reference, event, description..."
+                value="{{ search }}"
+            >
+        </div>
+
+        <div class="field">
+            <label for="status">Status</label>
+            <select id="status" name="status">
+                <option value="">All statuses</option>
+                <option value="OPEN" {% if status == "OPEN" %}selected{% endif %}>
+                    Open
+                </option>
+                <option value="RESOLVED" {% if status == "RESOLVED" %}selected{% endif %}>
+                    Resolved
+                </option>
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="severity">Severity</label>
+            <select id="severity" name="severity">
+                <option value="">All severities</option>
+                {% for level in ["CRITICAL", "HIGH", "MEDIUM", "LOW"] %}
+                <option value="{{ level }}" {% if severity == level %}selected{% endif %}>
+                    {{ level }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button class="button primary" type="submit">Apply Filters</button>
+        <a class="button" href="/incidents">Reset</a>
+    </form>
+
+    <section class="table-card">
+        <div class="table-heading">
+            <h2>Incident Records</h2>
+            <span class="result-count">
+                {{ filtered_count }} matching · showing up to 200
+            </span>
+        </div>
+
+        {% if incidents %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Reference</th>
+                        <th>Event</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for incident in incidents %}
+                    <tr>
+                        <td>
+                            {{ incident.timestamp.strftime("%Y-%m-%d %H:%M:%S") if incident.timestamp else "—" }}
+                        </td>
+
+                        <td class="ref">{{ incident.incident_ref }}</td>
+
+                        <td>{{ incident.event_type }}</td>
+
+                        <td>
+                            <span class="badge {{ incident.severity|lower }}">
+                                {{ incident.severity }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="badge {{ incident.status|lower }}">
+                                {{ incident.status }}
+                            </span>
+                        </td>
+
+                        <td class="description">
+                            {{ incident.description or incident.value or "No description recorded" }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">
+            <p>No incidents match these filters.</p>
+            <a class="button" href="/incidents">Clear filters</a>
+        </div>
+        {% endif %}
+    </section>
+
+    <footer>
+        SENTRIX Security Operations Center · Incident records are read-only
+    </footer>
+
+</div>
+</body>
+</html>

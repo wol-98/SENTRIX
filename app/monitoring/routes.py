@@ -4,7 +4,8 @@
 from io import BytesIO
 from datetime import datetime
 
-from flask import send_file, current_app
+from flask import send_file, current_app, render_template, request
+from sqlalchemy import or_
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -51,7 +52,66 @@ ALERT_EVENT_TYPES = {
     ): "DDoS SUSPECTED",
     "INTRUSION: MOTION DETECTED": "INTRUSION DETECTED",
 }
+@monitoring_bp.route("/incidents", methods=["GET"])
+@login_required
+def incident_console():
+    """Display and filter recorded security incidents."""
 
+    status = request.args.get("status", "").upper()
+    severity = request.args.get("severity", "").upper()
+    search = request.args.get("q", "").strip()
+
+    valid_statuses = {"OPEN", "RESOLVED"}
+    valid_severities = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
+
+    query = IncidentLog.query
+
+    if status in valid_statuses:
+        query = query.filter(IncidentLog.status == status)
+
+    if severity in valid_severities:
+        query = query.filter(IncidentLog.severity == severity)
+
+    if search:
+        pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                IncidentLog.incident_ref.ilike(pattern),
+                IncidentLog.event_type.ilike(pattern),
+                IncidentLog.description.ilike(pattern),
+                IncidentLog.value.ilike(pattern),
+            )
+        )
+
+    filtered_count = query.count()
+
+    incidents = (
+        query
+        .order_by(IncidentLog.timestamp.desc())
+        .limit(200)
+        .all()
+    )
+
+    summary = {
+        "total": IncidentLog.query.count(),
+        "open": IncidentLog.query.filter_by(status="OPEN").count(),
+        "resolved": IncidentLog.query.filter_by(
+            status="RESOLVED"
+        ).count(),
+        "critical": IncidentLog.query.filter_by(
+            severity="CRITICAL"
+        ).count(),
+    }
+
+    return render_template(
+        "incidents.html",
+        incidents=incidents,
+        summary=summary,
+        status=status,
+        severity=severity,
+        search=search,
+        filtered_count=filtered_count,
+    )
 @monitoring_bp.route("/api/monitor", methods=["GET"])
 @login_required
 def get_monitor_data():

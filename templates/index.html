@@ -34,6 +34,56 @@
         h1 { font-family: 'Roboto Mono', monospace; font-size: 1.6rem; margin: 0; letter-spacing: -1px; line-height: 1.2; }
         .subtitle { color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px; }
 
+
+        /* DASHBOARD HEADER ACTIONS */
+        .header-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .header-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 9px 16px;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header-action:hover {
+            border-color: var(--neon-blue);
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        .header-action:focus-visible {
+            outline: 2px solid var(--neon-blue);
+            outline-offset: 3px;
+        }
+
+        .header-action.primary {
+            background: var(--neon-blue);
+            border-color: var(--neon-blue);
+            color: #ffffff;
+        }
+
+        .header-action.primary:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+
         /* ALERT BANNER */
         #alert-box { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: 700; text-align: center; font-family: 'Roboto Mono', monospace; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
         .safe-state { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-safe); color: var(--accent-safe); }
@@ -90,13 +140,17 @@
             <span id="conn-text">CONNECTING</span>
             <div id="conn-dot" class="status-dot"></div>
         </div>
+        <div class="header-actions">
+            <a href="/incidents" class="header-action">
+                <i class="fa-solid fa-list-check"></i>
+                Incident Console
+            </a>
 
-        <button onclick="window.location.href='/api/report'" style="
-            margin-top: 15px; background: var(--card-bg); color: var(--text-secondary); border: 1px solid #334155; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.85rem; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
-        " onmouseover="this.style.borderColor='var(--neon-blue)'; this.style.color='var(--text-primary)'" 
-           onmouseout="this.style.borderColor='#334155'; this.style.color='var(--text-secondary)'">
-            <i class="fa-solid fa-file-pdf"></i> Download Security Audit
-        </button>
+            <a href="/api/report" class="header-action primary">
+                <i class="fa-solid fa-file-pdf"></i>
+                Download Security Audit
+            </a>
+        </div>
     </div>
 
     <div class="container">
