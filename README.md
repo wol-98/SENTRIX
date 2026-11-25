@@ -1,4 +1,3 @@
-# SecureSentinel-XDR
 # SENTRIX
 
 ### Intelligent Security Monitoring & Threat Response Platform
