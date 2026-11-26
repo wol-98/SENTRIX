@@ -27,6 +27,12 @@
             --card-radius: 12px;
             --card-padding: 24px;
             --card-border-color: #334155;
+            --font-ui: 'Inter', sans-serif;
+            --font-data: 'Roboto Mono', monospace;
+            --font-size-xs: 0.75rem;
+            --font-size-sm: 0.85rem;
+            --font-size-base: 0.9rem;
+            --font-size-title: 1.1rem;
 
             --bg-color: #0f172a;
 
@@ -50,7 +56,15 @@
 
         *, *::before, *::after { box-sizing: border-box; }
 
-        body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); margin: 0; padding: 15px; }
+        body {
+            font-family: var(--font-ui);
+            font-size: var(--font-size-base);
+            line-height: 1.5;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 15px;
+        }
 
 /* HEADER */
         .header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; position: relative; }
@@ -65,9 +79,9 @@
 
         @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        h1 { font-family: 'Roboto Mono', monospace; font-size: 1.6rem; margin: 0; letter-spacing: -1px; line-height: 1.2; }
+        h1 { font-family: var(--font-data); font-size: 1.6rem; margin: 0; letter-spacing: -0.04em; line-height: 1.2; font-weight: 700; }
 
-        .subtitle { color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px; }
+        .subtitle { color: var(--text-secondary); font-size: var(--font-size-sm); line-height: 1.45; margin-top: 6px; }
 
 /* DASHBOARD HEADER ACTIONS */
         .header-actions {
@@ -196,16 +210,16 @@
 
         .card-header i { font-size: 1.3rem; margin-right: 0; flex: 0 0 auto; }
 
-        .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); min-width: 0; line-height: 1.4; }
+        .card-title { font-size: var(--font-size-title); font-weight: 600; color: var(--text-primary); min-width: 0; line-height: 1.35; letter-spacing: -0.015em; }
 
 /* METRICS BOXES */
         .metrics-row { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px; }
 
         .metric-item { text-align: center; background: #0f172a; padding: 15px 5px; border-radius: 8px; flex: 1; }
 
-        .metric-label { display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+        .metric-label { display: block; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 600; line-height: 1.35; margin-bottom: 6px; letter-spacing: 0.045em; text-transform: uppercase; }
 
-        .metric-value { font-family: 'Roboto Mono', monospace; font-size: 1.2rem; font-weight: 700; }
+        .metric-value { font-family: var(--font-data); font-size: 1.2rem; font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; }
 
         .sensor-health { display: flex; align-items: center; gap: 8px; margin: -3px 0 14px; color: var(--text-secondary); font-size: 0.75rem; font-family: 'Roboto Mono', monospace; }
 
@@ -218,7 +232,24 @@
 /* AI BOX */
         .ai-box { background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid var(--neon-blue); font-size: 0.85rem; line-height: 1.4; display: flex; align-items: center; }
 
-        .chart-container { position: relative; width: 100%; flex-grow: 1; min-height: 200px; }
+        .chart-container { position: relative; width: 100%; flex-grow: 1; min-height: 200px; min-width: 0; }
+        .chart-empty-state {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            text-align: center;
+            font-size: var(--font-size-sm);
+            line-height: 1.55;
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px dashed #475569;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .chart-empty-state[hidden] { display: none; }
 
 /* --- CONTROL SWITCHES --- */
         .control-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: #0f172a; padding: 12px; border-radius: 8px; }
@@ -376,14 +407,14 @@
         }
 
         .analytics-message {
-
             color: var(--text-secondary);
-
-            font-size: 0.85rem;
-
-            margin: 10px 0;
-
+            font-size: var(--font-size-sm);
+            line-height: 1.55;
+            margin: 10px 0 16px;
+            min-height: 1.5em;
         }
+        .analytics-message[data-state="empty"] { color: #cbd5e1; }
+        .analytics-message[data-state="error"] { color: #fca5a5; }
 
 
         @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -518,7 +549,8 @@
             width: 100%;
             border-collapse: collapse;
             background: #1e293b;
-            font-size: 0.85rem;
+            font-size: var(--font-size-sm);
+            line-height: 1.5;
         }
 
         #alerting-section .data-table th {
@@ -550,9 +582,16 @@
         }
 
         #alerting-section .data-table td[colspan] {
-            padding: 22px 15px;
+            padding: 24px 18px;
             text-align: center;
             color: var(--text-secondary);
+            line-height: 1.6;
+            background: rgba(15, 23, 42, 0.35);
+        }
+        #sensor-analytics-history td[colspan] {
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.6;
         }
 
         /* Smaller screens */
@@ -720,7 +759,10 @@
 
                 </div>
 
-                <div class="chart-container"><canvas id="tempChart"></canvas></div>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                    <div id="temp-chart-empty" class="chart-empty-state" role="status" aria-live="polite">Waiting for live sensor readings…</div>
+                </div>
 
             </div>
 
@@ -744,7 +786,10 @@
 
                 </div>
 
-                <div class="chart-container"><canvas id="cpuChart"></canvas></div>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                    <div id="cpu-chart-empty" class="chart-empty-state" role="status" aria-live="polite">Waiting for system metrics…</div>
+                </div>
 
             </div>
 
@@ -1039,9 +1084,8 @@
                         </div>
 
                         <div class="chart-container">
-
                             <canvas id="incident-trend-chart"></canvas>
-
+                            <div id="incident-trend-empty" class="chart-empty-state" role="status" aria-live="polite" hidden>No incident trend data for this period.</div>
                         </div>
 
                     </div>
@@ -1055,9 +1099,8 @@
                         </div>
 
                         <div class="chart-container">
-
                             <canvas id="incident-severity-chart"></canvas>
-
+                            <div id="incident-severity-empty" class="chart-empty-state" role="status" aria-live="polite" hidden>No severity data to display.</div>
                         </div>
 
                     </div>
@@ -1071,9 +1114,8 @@
                         </div>
 
                         <div class="chart-container">
-
                             <canvas id="incident-event-chart"></canvas>
-
+                            <div id="incident-event-empty" class="chart-empty-state" role="status" aria-live="polite" hidden>No event types recorded for this period.</div>
                         </div>
 
                     </div>
@@ -1114,7 +1156,7 @@
                             </thead>
                             <tbody id="alert-rules-body">
                                 <tr>
-                                    <td colspan="6">Alert rules will appear here.</td>
+                                    <td colspan="6">No alert rules configured yet. Create your first rule below.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1231,7 +1273,7 @@
                             <tbody id="notification-history-body">
                                 <tr>
                                     <td colspan="8">
-                                        Notification history will appear here.
+                                        No notification attempts yet. History will appear after an alert triggers a notification.
                                     </td>
                                 </tr>
                             </tbody>
@@ -1244,21 +1286,121 @@
 
     <script>
 
-        Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = '#334155'; Chart.defaults.font.family = "'Roboto Mono', monospace";
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#334155';
+        Chart.defaults.font.family = 'Inter, sans-serif';
+        Chart.defaults.font.size = 12;
+        Chart.defaults.plugins.tooltip.backgroundColor = '#0f172a';
+        Chart.defaults.plugins.tooltip.titleColor = '#f8fafc';
+        Chart.defaults.plugins.tooltip.bodyColor = '#cbd5e1';
+        Chart.defaults.plugins.tooltip.borderColor = '#475569';
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.displayColors = true;
+
+        function setChartEmptyState(elementId, isVisible, message) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            if (message) element.textContent = message;
+            element.hidden = !isVisible;
+        }
 
         const ctxTemp = document.getElementById('tempChart').getContext('2d');
-
         const ctxCpu = document.getElementById('cpuChart').getContext('2d');
 
-        const gradientTemp = ctxTemp.createLinearGradient(0, 0, 0, 400); gradientTemp.addColorStop(0, 'rgba(245, 158, 11, 0.5)'); gradientTemp.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        const gradientTemp = ctxTemp.createLinearGradient(0, 0, 0, 400);
+        gradientTemp.addColorStop(0, 'rgba(245, 158, 11, 0.38)');
+        gradientTemp.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        const gradientCpu = ctxCpu.createLinearGradient(0, 0, 0, 400);
+        gradientCpu.addColorStop(0, 'rgba(59, 130, 246, 0.32)');
+        gradientCpu.addColorStop(1, 'rgba(59, 130, 246, 0)');
 
-        const gradientCpu = ctxCpu.createLinearGradient(0, 0, 0, 400); gradientCpu.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); gradientCpu.addColorStop(1, 'rgba(59, 130, 246, 0)');
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            animation: { duration: 250 },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(71, 85, 105, 0.45)' },
+                    ticks: { font: { size: 11 }, padding: 8 }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { display: false }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    titleFont: { weight: '600' },
+                    bodyFont: { size: 12 }
+                }
+            }
+        };
 
-        const commonOptions = { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { display: false } } }, plugins: { legend: { display: false } } };
+        const tempChart = new Chart(ctxTemp, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temperature (°C)',
+                    borderColor: '#f59e0b',
+                    backgroundColor: gradientTemp,
+                    borderWidth: 2,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: '#fbbf24',
+                    fill: true,
+                    tension: 0.32,
+                    data: []
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: { color: 'rgba(71, 85, 105, 0.45)' },
+                        ticks: { font: { size: 11 }, padding: 8 }
+                    },
+                    x: { display: false }
+                }
+            }
+        });
 
-        const tempChart = new Chart(ctxTemp, { type: 'line', data: { labels: [], datasets: [{ label: 'Temp', borderColor: '#f59e0b', backgroundColor: gradientTemp, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: false, grid: { color: '#334155' } }, x: { display: false } } } });
-
-        const cpuChart = new Chart(ctxCpu, { type: 'line', data: { labels: [], datasets: [{ label: 'CPU', borderColor: '#3b82f6', backgroundColor: gradientCpu, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: true, max: 100 }, x: { display: false } } } });
+        const cpuChart = new Chart(ctxCpu, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    borderColor: '#3b82f6',
+                    backgroundColor: gradientCpu,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: true,
+                    tension: 0.32,
+                    data: []
+                }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(71, 85, 105, 0.45)' },
+                        ticks: { font: { size: 11 }, padding: 8 }
+                    },
+                    x: { display: false }
+                }
+            }
+        });
 
         let lastTemperatureEpoch = null;
 
@@ -1356,9 +1498,9 @@
 
                 if (sensorLive && readingEpoch != null && readingEpoch !== lastTemperatureEpoch) {
 
-                    if(tempChart.data.labels.length > 20) tempChart.data.labels.shift();
+                    if(tempChart.data.labels.length >= 20) tempChart.data.labels.shift();
 
-                    if(tempChart.data.datasets[0].data.length > 20) tempChart.data.datasets[0].data.shift();
+                    if(tempChart.data.datasets[0].data.length >= 20) tempChart.data.datasets[0].data.shift();
 
                     tempChart.data.labels.push(data.iot_metrics.last_update || timeNow);
 
@@ -1370,11 +1512,31 @@
 
                 }
 
-                if(cpuChart.data.labels.length > 20) cpuChart.data.labels.shift(); cpuChart.data.labels.push(timeNow);
+                setChartEmptyState(
+                    'temp-chart-empty',
+                    !sensorLive || tempChart.data.datasets[0].data.length === 0,
+                    !sensorLive
+                        ? 'Sensor is offline or stale. Live temperature readings will appear here.'
+                        : 'Collecting temperature readings…'
+                );
+                if (cpuChart.data.labels.length >= 20) cpuChart.data.labels.shift();
+                cpuChart.data.labels.push(timeNow);
 
-                if(cpuChart.data.datasets[0].data.length > 20) cpuChart.data.datasets[0].data.shift(); cpuChart.data.datasets[0].data.push(data.security_metrics.cpu_usage); cpuChart.update();
+                const cpuSeries = cpuChart.data.datasets[0].data;
+                if (cpuSeries.length >= 20) cpuSeries.shift();
+                const cpuValue = data.security_metrics.cpu_usage;
+                const validCpuValue = cpuValue !== null
+                    && cpuValue !== undefined
+                    && Number.isFinite(Number(cpuValue));
+                cpuSeries.push(validCpuValue ? Number(cpuValue) : null);
+                cpuChart.update();
+                setChartEmptyState(
+                    'cpu-chart-empty',
+                    !cpuSeries.some(value => value !== null && Number.isFinite(Number(value))),
+                    'Waiting for system metrics…'
+                );
 
-// Alert Logic
+                // Alert Logic
                 const alertBox = document.getElementById('alert-box');
 
                 const rawStatus = data.security_metrics.alert_status;
@@ -1419,167 +1581,159 @@
 
                 }
 
-            } catch (error) { console.error("Error:", error); document.getElementById('conn-text').innerText = "DISCONNECTED"; document.getElementById('conn-dot').className = "status-dot status-offline"; }
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById('conn-text').innerText = "DISCONNECTED";
+                document.getElementById('conn-dot').className = "status-dot status-offline";
+                setChartEmptyState(
+                    'temp-chart-empty',
+                    true,
+                    'Live sensor data is unavailable. Reconnecting to the monitor…'
+                );
+                setChartEmptyState(
+                    'cpu-chart-empty',
+                    true,
+                    'System metrics are unavailable. Reconnecting to the monitor…'
+                );
+            }
 
         }
 
         setInterval(fetchData, 1000); 
 
 // --- SECURITY ANALYTICS ---
-            const analyticsTrendChart = new Chart(
-
-                document.getElementById('incident-trend-chart'),
-
-                {
-
-                    type: 'line',
-
-                    data: {
-
-                        labels: [],
-
-                        datasets: [{
-
-                            label: 'Incidents',
-
-                            data: [],
-
-                            borderColor: '#3b82f6',
-
-                            backgroundColor: 'rgba(59, 130, 246, 0.15)',
-
-                            fill: true,
-
-                            tension: 0.3
-
-                        }]
-
+            const analyticsChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: '#0f172a',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#475569',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: { weight: '600' },
+                        bodyFont: { size: 12 }
                     },
-
-                    options: {
-
-                        responsive: true,
-
-                        maintainAspectRatio: false,
-
-                        scales: {
-
-                            y: {
-
-                                beginAtZero: true,
-
-                                ticks: { precision: 0 },
-
-                                grid: { color: '#334155' }
-
-                            },
-
-                            x: { grid: { display: false } }
-
+                    legend: {
+                        labels: {
+                            color: '#cbd5e1',
+                            font: { family: 'Inter, sans-serif', size: 12 },
+                            boxWidth: 10,
+                            boxHeight: 10,
+                            padding: 14
                         }
-
                     }
-
                 }
+            };
 
+            const analyticsTrendChart = new Chart(
+                document.getElementById('incident-trend-chart'),
+                {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Incidents',
+                            data: [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.14)',
+                            pointBackgroundColor: '#60a5fa',
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        ...analyticsChartOptions,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0, font: { size: 11 }, padding: 8 },
+                                grid: { color: 'rgba(71, 85, 105, 0.45)' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { maxRotation: 0, autoSkip: true, font: { size: 11 } }
+                            }
+                        },
+                        plugins: {
+                            ...analyticsChartOptions.plugins,
+                            legend: { display: false }
+                        }
+                    }
+                }
             );
 
             const analyticsSeverityChart = new Chart(
-
                 document.getElementById('incident-severity-chart'),
-
                 {
-
                     type: 'doughnut',
-
                     data: {
-
                         labels: [],
-
                         datasets: [{
-
                             data: [],
-
-                            backgroundColor: [
-
-                                '#ef4444',
-
-                                '#f97316',
-
-                                '#f59e0b',
-
-                                '#3b82f6'
-
-                            ]
-
+                            backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
+                            borderColor: '#1e293b',
+                            borderWidth: 3,
+                            hoverOffset: 6
                         }]
-
                     },
-
                     options: {
-
-                        responsive: true,
-
-                        maintainAspectRatio: false
-
+                        ...analyticsChartOptions,
+                        cutout: '68%',
+                        plugins: {
+                            ...analyticsChartOptions.plugins,
+                            legend: {
+                                position: 'bottom',
+                                labels: analyticsChartOptions.plugins.legend.labels
+                            }
+                        }
                     }
-
                 }
-
             );
 
             const analyticsEventChart = new Chart(
-
                 document.getElementById('incident-event-chart'),
-
                 {
-
                     type: 'bar',
-
                     data: {
-
                         labels: [],
-
                         datasets: [{
-
                             label: 'Incidents',
-
                             data: [],
-
-                            backgroundColor: '#3b82f6'
-
+                            backgroundColor: 'rgba(59, 130, 246, 0.78)',
+                            hoverBackgroundColor: '#60a5fa',
+                            borderRadius: 5,
+                            borderSkipped: false,
+                            maxBarThickness: 28
                         }]
-
                     },
-
                     options: {
-
-                        responsive: true,
-
-                        maintainAspectRatio: false,
-
+                        ...analyticsChartOptions,
                         indexAxis: 'y',
-
                         scales: {
-
                             x: {
-
                                 beginAtZero: true,
-
-                                ticks: { precision: 0 },
-
-                                grid: { color: '#334155' }
-
+                                ticks: { precision: 0, font: { size: 11 }, padding: 8 },
+                                grid: { color: 'rgba(71, 85, 105, 0.45)' }
                             },
-
-                            y: { grid: { display: false } }
-
+                            y: {
+                                grid: { display: false },
+                                ticks: { font: { size: 11 }, padding: 8 }
+                            }
+                        },
+                        plugins: {
+                            ...analyticsChartOptions.plugins,
+                            legend: { display: false }
                         }
-
                     }
-
                 }
-
             );
 
             function getAnalyticsDateRange() {
@@ -1805,13 +1959,15 @@
 
                 const message = document.getElementById('analytics-message');
 
-                message.textContent = 'Loading analytics...';
+                message.dataset.state = 'loading';
+                message.textContent = 'Loading analytics…';
 
                 const params = new URLSearchParams();
 
                 const range = getAnalyticsDateRange();
                 if (document.getElementById('analytics-period').value === 'custom' &&
                     (!range.start_date || !range.end_date)) {
+                    message.dataset.state = 'empty';
                     message.textContent = 'Choose both dates for a custom range.';
                     return;
                 }
@@ -1886,6 +2042,11 @@
                         data.daily_trends.map(item => item.count);
 
                     analyticsTrendChart.update();
+                    setChartEmptyState(
+                        'incident-trend-empty',
+                        analyticsTrendChart.data.datasets[0].data.length === 0,
+                        'No incident trend data for this period.'
+                    );
 
                     const severityEntries =
 
@@ -1900,6 +2061,11 @@
                         severityEntries.map(item => item[1]);
 
                     analyticsSeverityChart.update();
+                    setChartEmptyState(
+                        'incident-severity-empty',
+                        severityEntries.reduce((total, item) => total + Number(item[1] || 0), 0) === 0,
+                        'No severity data to display for this period.'
+                    );
 
                     const eventEntries =
 
@@ -1916,18 +2082,26 @@
                         eventEntries.map(item => item[1]);
 
                     analyticsEventChart.update();
+                    setChartEmptyState(
+                        'incident-event-empty',
+                        eventEntries.reduce((total, item) => total + Number(item[1] || 0), 0) === 0,
+                        'No event types recorded for this period.'
+                    );
 
+                    message.dataset.state = data.total_incidents === 0 ? 'empty' : 'success';
                     message.textContent = data.total_incidents === 0
-
-                        ? 'No incidents found for the selected filters.'
-
+                        ? 'No incidents found for the selected filters. Adjust the date range or filters to explore other activity.'
                         : 'Analytics updated successfully.';
 
                 } catch (error) {
 
                     console.error('Analytics error:', error);
 
-                    message.textContent = 'Unable to load analytics.';
+                    message.dataset.state = 'error';
+                    message.textContent = 'Unable to load analytics. Check your connection and try again.';
+                    setChartEmptyState('incident-trend-empty', true, 'Analytics unavailable. Try refreshing.');
+                    setChartEmptyState('incident-severity-empty', true, 'Analytics unavailable. Try refreshing.');
+                    setChartEmptyState('incident-event-empty', true, 'Analytics unavailable. Try refreshing.');
 
                 }
 
@@ -2052,7 +2226,7 @@
 
                     if (!data.rules || data.rules.length === 0) {
                         const row = document.createElement('tr');
-                        const cell = addTableCell(row, 'No alert rules configured.');
+                        const cell = addTableCell(row, 'No alert rules configured yet. Create a rule using the form below.');
                         cell.colSpan = 6;
                         alertRulesBody.appendChild(row);
                         return;
@@ -2141,7 +2315,7 @@
 
                     if (!data.deliveries || data.deliveries.length === 0) {
                         const row = document.createElement('tr');
-                        const cell = addTableCell(row, 'No notification attempts found.');
+                        const cell = addTableCell(row, 'No notification attempts match these filters.');
                         cell.colSpan = 8;
                         notificationHistoryBody.appendChild(row);
                         return;

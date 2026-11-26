@@ -1,6 +1,8 @@
 """Security monitoring routes for SENTRIX."""
 
 from io import BytesIO
+from app.models.sensor import SensorData
+from reportlab.platypus import KeepTogether
 from datetime import datetime
 from app.extensions import db
 import logging
@@ -20,8 +22,9 @@ from sqlalchemy.exc import IntegrityError
 from app.services.alerting import create_alerts_for_event
 from app.services.dispatcher import dispatch_alert
 
+from xml.sax.saxutils import escape
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
@@ -883,22 +886,88 @@ def get_monitor_data():
 
     return jsonify(system_state)
 
-
 @monitoring_bp.route("/api/report", methods=["GET"])
 @login_required
 def download_security_report():
-    """Generate and download the SENTRIX Security Audit PDF."""
+    """Generate a trustworthy, current-state SENTRIX security audit PDF."""
+    from io import BytesIO
+    from datetime import datetime
+    import time
+
+    from flask import current_app, send_file
+    from app.models.sensor import SensorData
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether,
+        PageBreak,
+    )
+    from xml.sax.saxutils import escape
 
     buffer = BytesIO()
-
     generated_at = datetime.now()
-    current_status = system_state["security_metrics"].get(
-        "alert_status", "UNKNOWN"
+
+    security_metrics = system_state.get("security_metrics", {})
+    sensor_metrics = system_state.get("iot_metrics", {})
+    dashboard_alert_state = security_metrics.get("alert_status") or "UNKNOWN"
+
+    # Freshness is derived from the last successful telemetry update, not from
+    # default sensor values or the cached sensor_health status.
+    last_update_epoch = sensor_metrics.get("last_update_epoch")
+    try:
+        last_update_epoch = float(last_update_epoch)
+    except (TypeError, ValueError):
+        last_update_epoch = None
+
+    if last_update_epoch is None:
+        telemetry_age = None
+        telemetry_status = "OFFLINE"
+    else:
+        telemetry_age = max(0.0, time.time() - last_update_epoch)
+        if telemetry_age > 60:
+            telemetry_status = "OFFLINE"
+        elif telemetry_age > 10:
+            telemetry_status = "STALE"
+        else:
+            telemetry_status = "LIVE"
+
+    operational_health = "HEALTHY" if telemetry_status == "LIVE" else "DEGRADED"
+
+    # Current values are only reported as current when telemetry is live.
+    if telemetry_status == "LIVE":
+        temperature = sensor_metrics.get("temperature")
+        gas_level = sensor_metrics.get("gas_level")
+        motion = sensor_metrics.get("motion")
+    else:
+        temperature = gas_level = motion = None
+
+    # Include the latest persisted reading separately, with its timestamp.
+    latest_sensor_record = (
+        SensorData.query.order_by(SensorData.timestamp.desc()).first()
     )
 
-    sensor_metrics = system_state["iot_metrics"]
+    if latest_sensor_record:
+        stored_temperature = latest_sensor_record.temperature
+        stored_gas = latest_sensor_record.gas
+        stored_motion = latest_sensor_record.motion
+        stored_timestamp = latest_sensor_record.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        stored_reading = (
+            f"Temperature: {stored_temperature:.1f} °C; "
+            f"Gas: {stored_gas}; Motion: {stored_motion}"
+        )
+    else:
+        stored_reading = "No sensor reading stored"
+        stored_timestamp = "N/A"
 
-    # Retrieve the latest 100 incidents.
+    # The open count covers the entire incident table. The register and
+    # severity distribution are explicitly scoped to the latest 100 incidents.
+    open_count = IncidentLog.query.filter(
+        IncidentLog.status.ilike("OPEN")
+    ).count()
+
     incidents = (
         IncidentLog.query
         .order_by(IncidentLog.timestamp.desc())
@@ -906,238 +975,314 @@ def download_security_report():
         .all()
     )
 
-    # Count incidents by severity.
-    severity_counts = {
-        "CRITICAL": 0,
-        "HIGH": 0,
-        "MEDIUM": 0,
-        "LOW": 0,
-    }
-
+    severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
     for incident in incidents:
-        severity = incident.severity.upper()
-
+        severity = (incident.severity or "").upper()
         if severity in severity_counts:
             severity_counts[severity] += 1
 
-    # Create PDF document.
+    # Keep the landscape layout and existing PDF download endpoint.
     document = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
         rightMargin=15 * mm,
         leftMargin=15 * mm,
-        topMargin=15 * mm,
-        bottomMargin=15 * mm,
+        topMargin=20 * mm,
+        bottomMargin=16 * mm,
         title="SENTRIX Security Audit Report",
         author="SENTRIX Security Operations Center",
     )
 
     styles = getSampleStyleSheet()
+    navy = colors.HexColor("#0F172A")
+    blue = colors.HexColor("#2563EB")
+    pale_blue = colors.HexColor("#EFF6FF")
+    border = colors.HexColor("#CBD5E1")
+    slate = colors.HexColor("#475569")
+    red = colors.HexColor("#B91C1C")
+    orange = colors.HexColor("#C2410C")
+    green = colors.HexColor("#15803D")
 
     title_style = ParagraphStyle(
-        "SENTRIXTitle",
-        parent=styles["Title"],
-        alignment=TA_CENTER,
-        textColor=colors.HexColor("#2563EB"),
-        fontSize=22,
-        spaceAfter=6,
+        "SENTRIXTitle", parent=styles["Title"], alignment=TA_CENTER,
+        textColor=blue, fontSize=24, leading=28, spaceAfter=4,
     )
-
     subtitle_style = ParagraphStyle(
-        "SENTRIXSubtitle",
-        parent=styles["Normal"],
-        alignment=TA_CENTER,
-        fontSize=10,
-        textColor=colors.HexColor("#64748B"),
-        spaceAfter=18,
+        "SENTRIXSubtitle", parent=styles["Normal"], alignment=TA_CENTER,
+        fontSize=9, textColor=slate, spaceAfter=12,
     )
-
     section_style = ParagraphStyle(
-        "SENTRIXSection",
-        parent=styles["Heading2"],
-        textColor=colors.HexColor("#1D4ED8"),
-        spaceBefore=12,
-        spaceAfter=8,
+        "SENTRIXSection", parent=styles["Heading2"],
+        textColor=blue, fontSize=12, spaceBefore=8, spaceAfter=6,
+    )
+    body_style = ParagraphStyle(
+        "SENTRIXBody", parent=styles["Normal"], fontSize=8.5,
+        leading=11, textColor=navy,
+    )
+    small_style = ParagraphStyle(
+        "SENTRIXSmall", parent=body_style, fontSize=7.5,
+        leading=9, textColor=slate,
+    )
+    table_cell_style = ParagraphStyle(
+        "SENTRIXTableCell", parent=body_style, fontSize=7.5,
+        leading=9, wordWrap="CJK",
+    )
+    table_header_style = ParagraphStyle(
+        "SENTRIXTableHeader", parent=table_cell_style,
+        textColor=colors.white, fontName="Helvetica-Bold",
     )
 
-    story = []
+    def para(value, style=table_cell_style):
+        # Preserve valid zero values; only None/empty text means unavailable.
+        if value is None or value == "":
+            value = "N/A"
+        return Paragraph(escape(str(value)), style)
 
-    story.append(Paragraph("SENTRIX", title_style))
-    story.append(
-        Paragraph(
-            "Integrated IT/OT Security Operations Center",
-            subtitle_style,
-        )
-    )
+    def percent_value(value):
+        if value is None or value == "":
+            return "N/A"
+        try:
+            return f"{float(value):.1f}%"
+        except (TypeError, ValueError):
+            return "N/A"
 
-    story.append(
-        Paragraph("Security Audit Report", styles["Heading1"])
-    )
+    if isinstance(temperature, (int, float)) and not isinstance(temperature, bool):
+        temperature_display = f"{temperature:.1f} °C"
+    else:
+        temperature_display = "N/A"
 
-    story.append(
+    if isinstance(gas_level, (int, float)) and not isinstance(gas_level, bool):
+        gas_display = str(gas_level)
+    else:
+        gas_display = "N/A"
+
+    if motion == 1:
+        motion_display = "DETECTED"
+    elif motion == 0:
+        motion_display = "NONE"
+    else:
+        motion_display = "N/A"
+
+    story = [
+        Paragraph("SENTRIX", title_style),
+        Paragraph("Integrated IT/OT Security Operations Center", subtitle_style),
+        Paragraph("Security Audit Report", styles["Heading1"]),
         Paragraph(
             f"Generated: {generated_at.strftime('%Y-%m-%d %H:%M:%S')}",
             styles["Normal"],
-        )
-    )
-
-    story.append(Spacer(1, 8 * mm))
-
-    # Current system summary.
-    story.append(
-        Paragraph("Current System Status", section_style)
-    )
-
-    status_data = [
-        ["Metric", "Current Value"],
-        ["Security Status", str(current_status)],
-        [
-            "Temperature",
-            f"{sensor_metrics.get('temperature', 0)} °C",
-        ],
-        [
-            "Gas Level",
-            str(sensor_metrics.get("gas_level", 0)),
-        ],
-        [
-            "Motion",
-            (
-                "DETECTED"
-                if sensor_metrics.get("motion", 0) == 1
-                else "NONE"
-            ),
-        ],
-        [
-            "CPU Usage",
-            f"{system_state['security_metrics'].get('cpu_usage', 0)}%",
-        ],
-        [
-            "RAM Usage",
-            f"{system_state['security_metrics'].get('ram_usage', 0)}%",
-        ],
+        ),
+        Spacer(1, 5 * mm),
+        Paragraph("Executive Summary", section_style),
+        Paragraph(
+            "The dashboard alert state and operational telemetry health are "
+            "reported separately. A SAFE dashboard alert state does not prove "
+            "that the monitored environment is safe when telemetry is stale "
+            "or unavailable.",
+            body_style,
+        ),
+        Spacer(1, 3 * mm),
     ]
 
+    # KPI strip: 100-entry scope is explicit; open count is database-wide.
+    kpi_data = [
+        [para("INCIDENTS IN REGISTER", small_style),
+         para("OPEN INCIDENTS (ALL)", small_style),
+         para("CRITICAL IN REGISTER", small_style),
+         para("HIGH IN REGISTER", small_style)],
+        [para(len(incidents), body_style),
+         para(open_count, body_style),
+         para(severity_counts["CRITICAL"], body_style),
+         para(severity_counts["HIGH"], body_style)],
+    ]
+    kpi_table = Table(kpi_data, colWidths=[66.75 * mm] * 4)
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), pale_blue),
+        ("BOX", (0, 0), (-1, -1), 0.7, border),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, border),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    story.extend([kpi_table, Spacer(1, 4 * mm)])
+
+    story.append(Paragraph("Current System Status", section_style))
+
+    # Compact four-column status matrix keeps the complete summary on page 1.
+    status_rows = [
+        [
+            para("Metric", table_header_style), para("Value", table_header_style),
+            para("Metric", table_header_style), para("Value", table_header_style),
+        ],
+        [
+            para("Dashboard alert state"), para(dashboard_alert_state),
+            para("Operational health"), para(operational_health),
+        ],
+        [
+            para("Telemetry status"), para(telemetry_status),
+            para("Telemetry age"),
+            para(f"{telemetry_age:.1f} sec" if telemetry_age is not None else "N/A"),
+        ],
+        [
+            para("Temperature"), para(temperature_display),
+            para("Gas level"), para(gas_display),
+        ],
+        [
+            para("Motion"), para(motion_display),
+            para("CPU usage"), para(percent_value(security_metrics.get("cpu_usage"))),
+        ],
+        [
+            para("RAM usage"), para(percent_value(security_metrics.get("ram_usage"))),
+            para("Stored reading time"), para(stored_timestamp),
+        ],
+        [
+            para("Last stored sensor reading"), para(stored_reading), para(""), para(""),
+        ],
+    ]
     status_table = Table(
-        status_data,
-        colWidths=[55 * mm, 100 * mm],
+        status_rows,
+        colWidths=[37 * mm, 46 * mm, 37 * mm, 68 * mm],
+        repeatRows=1,
+        splitByRow=1,
+    )
+    status_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), navy),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F8FAFC")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F1F5F9")),
+        ("BACKGROUND", (2, 1), (2, -1), colors.HexColor("#F1F5F9")),
+        ("SPAN", (1, 6), (3, 6)),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    note = (
+        "N/A indicates unavailable current data. Stored readings are historical, "
+        "not live telemetry; numeric zero is a valid reading."
     )
 
-    status_table.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F8FAFC")),
-            ("PADDING", (0, 0), (-1, -1), 7),
-        ])
-    )
-
-    story.append(status_table)
-    story.append(Spacer(1, 8 * mm))
-
-    # Incident severity summary.
-    story.append(
-        Paragraph("Incident Summary", section_style)
-    )
-
-    severity_data = [
-        ["Severity", "Count"],
-        ["Critical", str(severity_counts["CRITICAL"])],
-        ["High", str(severity_counts["HIGH"])],
-        ["Medium", str(severity_counts["MEDIUM"])],
-        ["Low", str(severity_counts["LOW"])],
-        ["Total Included", str(len(incidents))],
+    # Place severity beside system status on page 1. This removes the mostly
+    # empty severity-only page while preserving the same severity counts.
+    severity_rows = [
+        [para("Severity", table_header_style), para("Count", table_header_style)],
+        [para("CRITICAL"), para(severity_counts["CRITICAL"])],
+        [para("HIGH"), para(severity_counts["HIGH"])],
+        [para("MEDIUM"), para(severity_counts["MEDIUM"])],
+        [para("LOW"), para(severity_counts["LOW"])],
+        [para("TOTAL"), para(len(incidents))],
     ]
+    severity_table = Table(severity_rows, colWidths=[48 * mm, 25 * mm])
+    severity_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), navy),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 1), (1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
 
-    severity_table = Table(
-        severity_data,
-        colWidths=[55 * mm, 35 * mm],
+    status_severity = Table(
+        [[status_table, severity_table]],
+        colWidths=[188 * mm, 78 * mm],
+        hAlign="LEFT",
     )
+    status_severity.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.extend([
+        status_severity,
+        Spacer(1, 1.5 * mm),
+        Paragraph(note, small_style),
+        Spacer(1, 2.5 * mm),
+    ])
 
-    severity_table.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-            ("PADDING", (0, 0), (-1, -1), 7),
-        ])
-    )
-
-    story.append(severity_table)
-    story.append(Spacer(1, 8 * mm))
-
-    # Incident details.
-    story.append(
-        Paragraph("Recent Security Incidents", section_style)
-    )
-
-    incident_data = [[
-        "Timestamp",
-        "Reference",
-        "Event",
-        "Severity",
-        "Status",
-        "Description",
+    # Keep the register flowing naturally after the executive overview.
+    # The incident table repeats its header when it continues on a new page.
+    register_intro = KeepTogether([
+        Paragraph("Incident Register", section_style),
+        Paragraph(
+            "Latest 100 incidents, ordered newest first. Descriptions are shown "
+            "as recorded in SENTRIX.",
+            small_style,
+        ),
+        Spacer(1, 1.5 * mm),
+    ])
+    story.append(register_intro)
+    incident_rows = [[
+        para("Timestamp", table_header_style),
+        para("Reference", table_header_style),
+        para("Event", table_header_style),
+        para("Severity", table_header_style),
+        para("Status", table_header_style),
+        para("Description", table_header_style),
     ]]
 
     for incident in incidents:
-        incident_data.append([
-            incident.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            incident.incident_ref[:8],
-            incident.event_type,
-            incident.severity,
-            incident.status,
-            incident.description or "",
+        incident_rows.append([
+            para(incident.timestamp.strftime("%Y-%m-%d %H:%M:%S")),
+            para((incident.incident_ref or "")[:8]),
+            para(incident.event_type),
+            para((incident.severity or "UNKNOWN").upper()),
+            para((incident.status or "UNKNOWN").upper()),
+            para(incident.description or "No description provided"),
         ])
 
     if not incidents:
-        incident_data.append([
-            "No incidents recorded",
-            "",
-            "",
-            "",
-            "",
-            "",
+        incident_rows.append([
+            para("No incidents recorded"), para(""), para(""),
+            para(""), para(""), para(""),
         ])
 
     incident_table = Table(
-        incident_data,
-        colWidths=[
-            32 * mm,
-            22 * mm,
-            35 * mm,
-            22 * mm,
-            22 * mm,
-            95 * mm,
-        ],
+        incident_rows,
+        colWidths=[32 * mm, 22 * mm, 52 * mm, 19 * mm, 30 * mm, 112 * mm],
         repeatRows=1,
     )
-
-    incident_table.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("PADDING", (0, 0), (-1, -1), 5),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ])
-    )
-
+    incident_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), navy),
+        ("GRID", (0, 0), (-1, -1), 0.45, border),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.4),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.2),
+    ]))
     story.append(incident_table)
 
-    # Build PDF.
-    document.build(story)
+    def draw_page(canvas, doc):
+        canvas.saveState()
+        page_width, page_height = landscape(A4)
+        canvas.setStrokeColor(border)
+        canvas.setLineWidth(0.6)
+        canvas.line(15 * mm, page_height - 13 * mm, page_width - 15 * mm, page_height - 13 * mm)
+        canvas.setFont("Helvetica-Bold", 8.5)
+        canvas.setFillColor(blue)
+        canvas.drawString(15 * mm, page_height - 10 * mm, "SENTRIX")
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(slate)
+        canvas.drawRightString(page_width - 15 * mm, page_height - 10 * mm, "SECURITY AUDIT REPORT")
+        canvas.line(15 * mm, 12 * mm, page_width - 15 * mm, 12 * mm)
+        canvas.setFont("Helvetica", 7)
+        canvas.drawString(15 * mm, 8 * mm, "Confidential • Internal Security Report")
+        canvas.drawRightString(page_width - 15 * mm, 8 * mm, f"Page {doc.page}")
+        canvas.restoreState()
 
+    document.build(story, onFirstPage=draw_page, onLaterPages=draw_page)
     buffer.seek(0)
 
-    current_app.logger.info(
-        "SENTRIX Security Audit report generated."
-    )
-
+    current_app.logger.info("SENTRIX Security Audit report generated.")
     return send_file(
         buffer,
         mimetype="application/pdf",
