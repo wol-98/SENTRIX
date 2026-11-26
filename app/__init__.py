@@ -44,6 +44,8 @@ def create_app(config_class=Config):
     # Register monitoring blueprint.
     from app.monitoring.routes import monitoring_bp
     app.register_blueprint(monitoring_bp)
+    from app.analytics.routes import analytics_bp
+    app.register_blueprint(analytics_bp)
 
     # Dashboard route.
     @app.route("/")

@@ -23,6 +23,9 @@ from reportlab.platypus import (
 )
 
 from app.models import IncidentLog, IncidentActivity
+from app.services.sensor_health import (
+    record_sensor_health_transition,
+)
 
 import time
 
@@ -357,6 +360,14 @@ def get_monitor_data():
             "Waiting..."
         ),
     }
+
+    record_sensor_health_transition(
+        status=sensor_status,
+        age_seconds=age_seconds,
+        last_seen_epoch=last_update_epoch,
+    )
+
+
 
     sensor_incident, sensor_incident_created = (
         sync_sensor_health_incident(
