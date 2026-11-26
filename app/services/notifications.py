@@ -96,3 +96,57 @@ def send_sms_alert(message):
         current_app.logger.exception(
             "SENTRIX SMS alert failed."
         )
+
+def send_sms_delivery(message):
+    """Send an SMS for the alert dispatcher and report the result.
+
+    The alert rule service manages cooldown and deduplication.
+    This function reports the actual Twilio delivery request result.
+    """
+
+    sms_client = _get_sms_client()
+
+    if sms_client is None:
+        return {
+            "success": False,
+            "provider_message_id": None,
+            "error": "SMS provider is not configured.",
+        }
+
+    recipient = current_app.config.get("TWILIO_TO")
+    sender = current_app.config.get("TWILIO_FROM")
+
+    if not recipient or not sender:
+        return {
+            "success": False,
+            "provider_message_id": None,
+            "error": "SMS recipient or sender is not configured.",
+        }
+
+    try:
+        result = sms_client.messages.create(
+            body=f"SENTRIX security alert: {message}",
+            from_=sender,
+            to=recipient,
+        )
+
+        current_app.logger.info(
+            "SENTRIX alert SMS submitted to provider."
+        )
+
+        return {
+            "success": True,
+            "provider_message_id": result.sid,
+            "error": None,
+        }
+
+    except Exception:
+        current_app.logger.exception(
+            "SENTRIX alert SMS delivery failed."
+        )
+
+        return {
+            "success": False,
+            "provider_message_id": None,
+            "error": "SMS provider request failed.",
+        }

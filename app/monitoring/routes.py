@@ -1,12 +1,24 @@
-
 """Security monitoring routes for SENTRIX."""
 
 from io import BytesIO
 from datetime import datetime
 from app.extensions import db
-
-from flask import send_file, current_app, render_template, request, url_for, redirect, flash, session
+import logging
+from flask import (
+    send_file,
+    current_app,
+    render_template,
+    request,
+    url_for,
+    redirect,
+    flash,
+    session,
+    jsonify,
+)
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
+from app.services.alerting import create_alerts_for_event
+from app.services.dispatcher import dispatch_alert
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -22,7 +34,13 @@ from reportlab.platypus import (
     PageBreak,
 )
 
-from app.models import IncidentLog, IncidentActivity
+from app.models import (
+    IncidentLog,
+    IncidentActivity,
+    AlertRule,
+    Alert,
+    NotificationDelivery,
+)
 from app.services.sensor_health import (
     record_sensor_health_transition,
 )
@@ -42,6 +60,7 @@ from app.services.incidents import (
     resolve_open_incidents,
     sync_sensor_health_incident,
 )
+logger = logging.getLogger(__name__)
 
 monitoring_bp = Blueprint("monitoring", __name__)
 
@@ -117,6 +136,339 @@ def incident_console():
         search=search,
         filtered_count=filtered_count,
     )
+
+
+@monitoring_bp.route("/api/alerts/rules", methods=["GET"])
+@login_required
+def list_alert_rules():
+    """Return configured alert rules."""
+    rules = AlertRule.query.order_by(AlertRule.name.asc()).all()
+
+    return jsonify({
+        "rules": [
+            {
+                "id": rule.id,
+                "rule_key": rule.rule_key,
+                "name": rule.name,
+                "event_type": rule.event_type,
+                "min_severity": rule.min_severity,
+                "enabled": rule.enabled,
+                "cooldown_seconds": rule.cooldown_seconds,
+                "created_at": rule.created_at.isoformat(),
+                "updated_at": rule.updated_at.isoformat(),
+            }
+            for rule in rules
+        ]
+    }), 200
+
+@monitoring_bp.route("/api/alerts/rules", methods=["POST"])
+@login_required
+def create_alert_rule():
+    """Create a configurable alert rule."""
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "A JSON object is required."}), 400
+
+    rule_key = data.get("rule_key")
+    name = data.get("name")
+    event_type = data.get("event_type")
+
+    if not isinstance(rule_key, str) or not rule_key.strip():
+        return jsonify({"error": "rule_key must be a non-empty string."}), 400
+
+    if not isinstance(name, str) or not name.strip():
+        return jsonify({"error": "name must be a non-empty string."}), 400
+
+    if not isinstance(event_type, str) or not event_type.strip():
+        return jsonify({"error": "event_type must be a non-empty string."}), 400
+
+    rule_key = rule_key.strip()
+    name = name.strip()
+    event_type = event_type.strip().upper()
+
+    if len(rule_key) > 100:
+        return jsonify({"error": "rule_key is too long."}), 400
+
+    if len(name) > 120:
+        return jsonify({"error": "name is too long."}), 400
+
+    if len(event_type) > 60:
+        return jsonify({"error": "event_type is too long."}), 400
+
+    min_severity = data.get("min_severity")
+    valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+    if min_severity is not None:
+        if not isinstance(min_severity, str):
+            return jsonify({"error": "Invalid min_severity."}), 400
+
+        min_severity = min_severity.strip().upper()
+
+        if min_severity not in valid_severities:
+            return jsonify({"error": "Invalid min_severity."}), 400
+
+    enabled = data.get("enabled", True)
+
+    if not isinstance(enabled, bool):
+        return jsonify({"error": "enabled must be true or false."}), 400
+
+    cooldown_seconds = data.get("cooldown_seconds", 0)
+
+    if (
+        isinstance(cooldown_seconds, bool)
+        or not isinstance(cooldown_seconds, int)
+        or cooldown_seconds < 0
+    ):
+        return jsonify({
+            "error": "cooldown_seconds must be a non-negative integer."
+        }), 400
+
+    rule = AlertRule(
+        rule_key=rule_key,
+        name=name,
+        event_type=event_type,
+        min_severity=min_severity,
+        enabled=enabled,
+        cooldown_seconds=cooldown_seconds,
+    )
+
+    db.session.add(rule)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "An alert rule with this key already exists."}), 409
+
+    return jsonify({
+        "message": "Alert rule created.",
+        "rule": {
+            "id": rule.id,
+            "rule_key": rule.rule_key,
+            "name": rule.name,
+            "event_type": rule.event_type,
+            "min_severity": rule.min_severity,
+            "enabled": rule.enabled,
+            "cooldown_seconds": rule.cooldown_seconds,
+            "created_at": rule.created_at.isoformat(),
+            "updated_at": rule.updated_at.isoformat(),
+        },
+    }), 201
+@monitoring_bp.route("/api/alerts/history", methods=["GET"])
+@login_required
+def notification_history():
+    """Return recent notification delivery attempts."""
+    status = request.args.get("status", "").strip().upper()
+    channel = request.args.get("channel", "").strip().upper()
+
+    valid_statuses = {"PENDING", "SENT", "FAILED"}
+    valid_channels = {"SMS", "EMAIL", "DASHBOARD"}
+
+    if status and status not in valid_statuses:
+        return jsonify({"error": "Invalid status filter."}), 400
+
+    if channel and channel not in valid_channels:
+        return jsonify({"error": "Invalid channel filter."}), 400
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer."}), 400
+
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100."}), 400
+
+    query = (
+        NotificationDelivery.query
+        .join(Alert, NotificationDelivery.alert_id == Alert.id)
+    )
+
+    if status:
+        query = query.filter(NotificationDelivery.status == status)
+
+    if channel:
+        query = query.filter(NotificationDelivery.channel == channel)
+
+    deliveries = (
+        query
+        .order_by(NotificationDelivery.attempted_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return jsonify({
+        "deliveries": [
+            {
+                "id": delivery.id,
+                "alert_id": delivery.alert_id,
+                "channel": delivery.channel,
+                "status": delivery.status,
+                "attempt_number": delivery.attempt_number,
+                "provider_message_id": delivery.provider_message_id,
+                "error_message": delivery.error_message,
+                "attempted_at": delivery.attempted_at.isoformat(),
+                "delivered_at": (
+                    delivery.delivered_at.isoformat()
+                    if delivery.delivered_at
+                    else None
+                ),
+                "alert": {
+                    "alert_ref": delivery.alert.alert_ref,
+                    "event_type": delivery.alert.event_type,
+                    "severity": delivery.alert.severity,
+                    "title": delivery.alert.title,
+                    "created_at": delivery.alert.created_at.isoformat(),
+                },
+            }
+            for delivery in deliveries
+        ],
+        "count": len(deliveries),
+    }), 200
+
+
+@monitoring_bp.route(
+    "/api/alerts/rules/<int:rule_id>",
+    methods=["PATCH"],
+)
+@login_required
+def update_alert_rule(rule_id):
+    """Update an alert rule or enable/disable it."""
+    rule = db.session.get(AlertRule, rule_id)
+
+    if rule is None:
+        return jsonify({"error": "Alert rule not found."}), 404
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict) or not data:
+        return jsonify({
+            "error": "A non-empty JSON object is required."
+        }), 400
+
+    allowed_fields = {
+        "name",
+        "event_type",
+        "min_severity",
+        "enabled",
+        "cooldown_seconds",
+    }
+
+    unknown_fields = set(data) - allowed_fields
+
+    if unknown_fields:
+        return jsonify({
+            "error": "Unsupported fields.",
+            "fields": sorted(unknown_fields),
+        }), 400
+
+    # Validate and normalize all values before changing the model.
+    updates = {}
+
+    if "name" in data:
+        name = data["name"]
+
+        if not isinstance(name, str) or not name.strip():
+            return jsonify({
+                "error": "name must be a non-empty string."
+            }), 400
+
+        name = name.strip()
+
+        if len(name) > 120:
+            return jsonify({
+                "error": "name must be 120 characters or fewer."
+            }), 400
+
+        updates["name"] = name
+
+    if "event_type" in data:
+        event_type = data["event_type"]
+
+        if not isinstance(event_type, str) or not event_type.strip():
+            return jsonify({
+                "error": "event_type must be a non-empty string."
+            }), 400
+
+        event_type = event_type.strip().upper()
+
+        if len(event_type) > 60:
+            return jsonify({
+                "error": "event_type must be 60 characters or fewer."
+            }), 400
+
+        updates["event_type"] = event_type
+
+    if "min_severity" in data:
+        min_severity = data["min_severity"]
+        valid_severities = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+
+        if min_severity is None:
+            updates["min_severity"] = None
+        elif isinstance(min_severity, str):
+            min_severity = min_severity.strip().upper()
+
+            if min_severity not in valid_severities:
+                return jsonify({
+                    "error": "Invalid min_severity."
+                }), 400
+
+            updates["min_severity"] = min_severity
+        else:
+            return jsonify({
+                "error": "Invalid min_severity."
+            }), 400
+
+    if "enabled" in data:
+        enabled = data["enabled"]
+
+        if not isinstance(enabled, bool):
+            return jsonify({
+                "error": "enabled must be true or false."
+            }), 400
+
+        updates["enabled"] = enabled
+
+    if "cooldown_seconds" in data:
+        cooldown_seconds = data["cooldown_seconds"]
+
+        if (
+            isinstance(cooldown_seconds, bool)
+            or not isinstance(cooldown_seconds, int)
+            or cooldown_seconds < 0
+        ):
+            return jsonify({
+                "error": "cooldown_seconds must be a non-negative integer."
+            }), 400
+
+        updates["cooldown_seconds"] = cooldown_seconds
+
+    # Apply only after every supplied field has passed validation.
+    for field, value in updates.items():
+        setattr(rule, field, value)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            "error": "Could not update alert rule."
+        }), 409
+
+    return jsonify({
+        "message": "Alert rule updated.",
+        "rule": {
+            "id": rule.id,
+            "rule_key": rule.rule_key,
+            "name": rule.name,
+            "event_type": rule.event_type,
+            "min_severity": rule.min_severity,
+            "enabled": rule.enabled,
+            "cooldown_seconds": rule.cooldown_seconds,
+            "created_at": rule.created_at.isoformat(),
+            "updated_at": rule.updated_at.isoformat(),
+        },
+    }), 200
 
 @monitoring_bp.route("/incidents/<int:incident_id>", methods=["GET"])
 @login_required
@@ -361,7 +713,7 @@ def get_monitor_data():
         ),
     }
 
-    record_sensor_health_transition(
+    health_transition = record_sensor_health_transition(
         status=sensor_status,
         age_seconds=age_seconds,
         last_seen_epoch=last_update_epoch,
@@ -379,6 +731,56 @@ def get_monitor_data():
             ),
         )
     )
+
+
+        # Create and dispatch an alert only when sensor health changes.
+    if health_transition and sensor_status in {"STALE", "OFFLINE"}:
+        try:
+            sensor_event_type = (
+                "SENSOR STALE"
+                if sensor_status == "STALE"
+                else "SENSOR OFFLINE"
+            )
+
+            sensor_alerts = create_alerts_for_event(
+                event_type=sensor_event_type,
+                severity=(
+                    "MEDIUM"
+                    if sensor_status == "STALE"
+                    else "HIGH"
+                ),
+                title=sensor_event_type,
+                message=(
+                    f"Sensor status changed to {sensor_status}. "
+                    f"Last seen: {iot_metrics.get('last_update', 'Unknown')}."
+                ),
+                source_type="sensor",
+                source_key=getattr(
+                    health_transition,
+                    "sensor_key",
+                    "default",
+                ),
+                incident_id=(
+                    sensor_incident.id
+                    if sensor_incident
+                    else None
+                ),
+                event_dedup_key=(
+                    f"sensor-health-transition:"
+                    f"{health_transition.id}"
+                ),
+            )
+
+            for sensor_alert in sensor_alerts:
+                dispatch_alert(sensor_alert.id)
+
+        except Exception:
+            logger.exception(
+                "Sensor health alerting failed; monitoring continues."
+            )
+
+
+
     prediction_message = (
         run_ml_prediction()
         if sensor_live
@@ -417,7 +819,8 @@ def get_monitor_data():
         )
 
     event_type = detection.event_type if detection else None
-
+    incident = None
+    created = False
     # Resolve previous alert incidents when no alert is active.
     if detection is None:
         resolve_open_incidents(
@@ -438,8 +841,33 @@ def get_monitor_data():
         )
 
         # Send SMS only when a new incident was created.
-        if incident and created:
+        # Alert only when a new incident is created.
+    if incident and created:
+        try:
+            detection_alerts = create_alerts_for_event(
+                event_type=detection.event_type,
+                severity=detection.severity,
+                title=detection.event_type,
+                message=detection.alert_message,
+                source_type="incident",
+                source_key=str(getattr(incident, "id", detection.event_type)),
+                incident_id=getattr(incident, "id", None),
+                event_dedup_key=f"incident-created:{getattr(incident, 'id', detection.event_type)}",
+            )
+
+            if detection_alerts:
+                for detection_alert in detection_alerts:
+                    dispatch_alert(detection_alert.id)
+            else:
+                # Preserve legacy SMS if no alert rule matches.
+                send_sms_alert(detection.alert_message)
+
+        except Exception:
+            logger.exception(
+                "Detection alerting failed; using legacy SMS fallback."
+            )
             send_sms_alert(detection.alert_message)
+            
 
 
     # --------------------------------------------------------
