@@ -5,6 +5,7 @@
 <head>
 
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
@@ -18,7 +19,14 @@
 
     <style>
 
+
         :root {
+
+            --layout-max-width: 1400px;
+            --section-spacing: 28px;
+            --card-radius: 12px;
+            --card-padding: 24px;
+            --card-border-color: #334155;
 
             --bg-color: #0f172a;
 
@@ -40,10 +48,11 @@
 
         }
 
+        *, *::before, *::after { box-sizing: border-box; }
+
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); margin: 0; padding: 15px; }
 
-/* HEADER */*
-
+/* HEADER */
         .header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; position: relative; }
 
         .connection-status { position: absolute; top: 5px; right: 0; font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 5px 10px; border-radius: 20px; border: 1px solid #334155; }
@@ -54,14 +63,13 @@
 
         .status-offline { background-color: var(--accent-danger); }
 
-        @keyframes *pulse-green* { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
         h1 { font-family: 'Roboto Mono', monospace; font-size: 1.6rem; margin: 0; letter-spacing: -1px; line-height: 1.2; }
 
         .subtitle { color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px; }
 
-/* DASHBOARD HEADER ACTIONS */*
-
+/* DASHBOARD HEADER ACTIONS */
         .header-actions {
 
             display: flex;
@@ -146,8 +154,7 @@
 
         }
 
-/* ALERT BANNER */*
-
+/* ALERT BANNER */
         #alert-box { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: 700; text-align: center; font-family: 'Roboto Mono', monospace; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
 
         .safe-state { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-safe); color: var(--accent-safe); }
@@ -156,20 +163,42 @@
 
         .sensor-warning { background-color: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warn); color: var(--accent-warn); }
 
-/* GRID LAYOUT */*
+/* GRID LAYOUT */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: var(--layout-max-width);
+            margin: 0 auto;
+            align-items: stretch;
+        }
 
-        .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; align-items: stretch; }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--card-radius);
+            padding: var(--card-padding);
+            border: 1px solid var(--card-border-color);
+            box-shadow: 0 8px 20px -3px rgba(0, 0, 0, 0.12);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
 
-        .card { background-color: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; }
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--card-border-color);
+            padding-bottom: 12px;
+        }
 
-        .card-header { display: flex; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .card-header i { font-size: 1.3rem; margin-right: 0; flex: 0 0 auto; }
 
-        .card-header i { font-size: 1.3rem; margin-right: 12px; }
+        .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); min-width: 0; line-height: 1.4; }
 
-        .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
-
-/* METRICS BOXES */*
-
+/* METRICS BOXES */
         .metrics-row { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px; }
 
         .metric-item { text-align: center; background: #0f172a; padding: 15px 5px; border-radius: 8px; flex: 1; }
@@ -186,14 +215,12 @@
 
         .sensor-stale .sensor-health-dot { background: var(--accent-warn); }
 
-/* AI BOX */*
-
+/* AI BOX */
         .ai-box { background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid var(--neon-blue); font-size: 0.85rem; line-height: 1.4; display: flex; align-items: center; }
 
         .chart-container { position: relative; width: 100%; flex-grow: 1; min-height: 200px; }
 
-/* --- CONTROL SWITCHES --- */*
-
+/* --- CONTROL SWITCHES --- */
         .control-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: #0f172a; padding: 12px; border-radius: 8px; }
 
         .control-label { font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
@@ -204,8 +231,7 @@
 
         .active-green { background: var(--accent-safe); color: white; }
 
-/* DESKTOP OVERRIDES */*
-
+/* DESKTOP OVERRIDES */
         @media (min-width: 768px) {
 
             body { padding: 30px; }
@@ -214,24 +240,22 @@
 
             .connection-status { top: 10px; font-size: 0.9rem; padding: 8px 15px; }
 
-            .card { padding: 25px; }
-
             .card-title { font-size: 1.3rem; }
 
             .metric-value { font-size: 1.6rem; }
 
             .chart-container { min-height: 260px; }
-
         }
 
-/* SECURITY ANALYTICS */*
-
+        /* SECURITY ANALYTICS */
         .analytics-section {
+            width: 100%;
+            max-width: var(--layout-max-width);
+            margin: var(--section-spacing) auto 0;
+        }
 
-            max-width: 1400px;
-
-            margin: 30px auto 0;
-
+        .analytics-section > .card-header {
+            margin-bottom: 16px;
         }
 
         .analytics-toolbar {
@@ -364,6 +388,10 @@
 
         @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 760px) {
+            :root {
+                --section-spacing: 22px;
+                --card-padding: 16px;
+            }
             body { padding: 12px; }
             .dashboard-grid, .analytics-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
             .analytics-grid > .card:last-child { grid-column: auto; }
@@ -375,7 +403,235 @@
             .analytics-metric { padding: 14px; }
             .analytics-metric .metric-value { font-size: 1.35rem; }
         }
-        @media (max-width: 420px) { .analytics-field { flex-basis: 100%; } .header-actions { flex-direction: column; } }
+        @media (max-width: 420px) {
+            :root {
+                --section-spacing: 18px;
+                --card-padding: 14px;
+            }
+            .dashboard-grid, .analytics-grid { gap: 12px; }
+            .analytics-field { flex-basis: 100%; }
+            .header-actions { flex-direction: column; }
+        }
+       /* ALERTING & NOTIFICATIONS */
+        #alerting-section {
+            width: 100%;
+            max-width: var(--layout-max-width);
+        }
+
+        #alerting-section > .card {
+            gap: 16px;
+            padding: var(--card-padding);
+        }
+
+        #alerting-section .card-header {
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        #alerting-section .card-header .card-title {
+            font-size: 1.05rem;
+        }
+
+        #alerting-section #alerts-message {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin: 0 0 4px;
+        }
+
+        /* Alerting form and filter toolbars */
+        #alerting-section .analytics-toolbar {
+            align-items: end;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        #alerting-section .analytics-toolbar label {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            flex: 1 1 170px;
+            min-width: 0;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        #alerting-section .analytics-toolbar input,
+        #alerting-section .analytics-toolbar select {
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 40px;
+            padding: 9px 11px;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            background: #0f172a;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.85rem;
+            color-scheme: dark;
+        }
+
+        #alerting-section .analytics-toolbar input:focus,
+        #alerting-section .analytics-toolbar select:focus {
+            outline: 2px solid var(--neon-blue);
+            outline-offset: 1px;
+            border-color: var(--neon-blue);
+        }
+
+        #alerting-section .analytics-toolbar button,
+        #alerting-section .btn {
+            min-height: 40px;
+            padding: 9px 15px;
+            border: 1px solid var(--neon-blue);
+            border-radius: 6px;
+            background: var(--neon-blue);
+            color: #fff;
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        #alerting-section .analytics-toolbar button:hover,
+        #alerting-section .btn:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+
+        #alerting-section button:focus-visible {
+            outline: 2px solid #93c5fd;
+            outline-offset: 3px;
+        }
+
+        /* Tables */
+        #alerting-section .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        #alerting-section .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1e293b;
+            font-size: 0.85rem;
+        }
+
+        #alerting-section .data-table th {
+            padding: 13px 15px;
+            text-align: left;
+            white-space: nowrap;
+            background: #0f172a;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid #334155;
+        }
+
+        #alerting-section .data-table td {
+            padding: 13px 15px;
+            border-bottom: 1px solid #334155;
+            color: var(--text-primary);
+            vertical-align: middle;
+        }
+
+        #alerting-section .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        #alerting-section .data-table tbody tr:hover {
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        #alerting-section .data-table td[colspan] {
+            padding: 22px 15px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* Smaller screens */
+        @media (max-width: 760px) {
+            #alerting-section > .card {
+                padding: var(--card-padding);
+            }
+
+            #alerting-section .analytics-toolbar {
+                padding: 12px;
+            }
+
+            #alerting-section .analytics-toolbar label {
+                flex-basis: 100%;
+            }
+
+            #alerting-section .analytics-toolbar button {
+                width: 100%;
+            }
+
+            #alerting-section .data-table {
+                min-width: 720px;
+            }
+        }
+
+        /* Alerting table badges */
+        #alerting-section .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            line-height: 1.2;
+            white-space: nowrap;
+            border: 1px solid transparent;
+        }
+
+        #alerting-section .status-rule-enabled,
+        #alerting-section .status-delivery-sent {
+            color: #86efac;
+            background: rgba(34, 197, 94, 0.18);
+            border-color: rgba(34, 197, 94, 0.45);
+        }
+
+        #alerting-section .status-rule-disabled {
+            color: #cbd5e1;
+            background: rgba(148, 163, 184, 0.14);
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        #alerting-section .status-delivery-pending,
+        #alerting-section .status-severity-medium {
+            color: #fde047;
+            background: rgba(234, 179, 8, 0.18);
+            border-color: rgba(234, 179, 8, 0.45);
+        }
+
+        #alerting-section .status-delivery-failed,
+        #alerting-section .status-severity-critical {
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.18);
+            border-color: rgba(239, 68, 68, 0.45);
+        }
+
+        #alerting-section .status-severity-high {
+            color: #fdba74;
+            background: rgba(249, 115, 22, 0.18);
+            border-color: rgba(249, 115, 22, 0.45);
+        }
+
+        #alerting-section .status-severity-low {
+            color: #93c5fd;
+            background: rgba(59, 130, 246, 0.18);
+            border-color: rgba(59, 130, 246, 0.45);
+        }
+
     </style>
 
 </head>
@@ -824,6 +1080,164 @@
 
                 </div>
 
+            </section>
+            <!-- Alerting & Notification Management -->
+            <section class="analytics-section" id="alerting-section">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Alerting &amp; Notifications</span>
+                        <button type="button" class="btn" id="alerts-refresh">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+
+                    <p id="alerts-message" role="status" aria-live="polite">
+                        Manage alert rules and review notification attempts.
+                    </p>
+
+                    <!-- Alert Rules -->
+                    <div class="card-header">
+                        <span class="card-title">Alert Rules</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="alert-rules-table">
+                            <thead>
+                                <tr>
+                                    <th>Rule</th>
+                                    <th>Event Type</th>
+                                    <th>Minimum Severity</th>
+                                    <th>Cooldown</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alert-rules-body">
+                                <tr>
+                                    <td colspan="6">Alert rules will appear here.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Create Alert Rule -->
+                    <div class="card-header">
+                        <span class="card-title">Create Alert Rule</span>
+                    </div>
+
+                    <form id="alert-rule-form">
+                        <div class="analytics-toolbar">
+                            <label>
+                                Rule Key
+                                <input type="text"
+                                       id="alert-rule-key"
+                                       maxlength="100"
+                                       required
+                                       placeholder="e.g. high-severity-incident">
+                            </label>
+
+                            <label>
+                                Rule Name
+                                <input type="text"
+                                       id="alert-rule-name"
+                                       maxlength="120"
+                                       required
+                                       placeholder="High severity incidents">
+                            </label>
+
+                            <label>
+                                Event Type
+                                <input type="text"
+                                       id="alert-rule-event"
+                                       maxlength="60"
+                                       required
+                                       placeholder="INCIDENT_CREATED">
+                            </label>
+
+                            <label>
+                                Minimum Severity
+                                <select id="alert-rule-severity">
+                                    <option value="">Any severity</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="CRITICAL">Critical</option>
+                                </select>
+                            </label>
+
+                            <label>
+                                Cooldown (seconds)
+                                <input type="number"
+                                       id="alert-rule-cooldown"
+                                       min="0"
+                                       step="1"
+                                       value="300"
+                                       required>
+                            </label>
+
+                            <button type="submit" class="btn" id="alert-rule-create">
+                                <i class="fas fa-plus"></i> Create Rule
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Notification History -->
+                    <div class="card-header">
+                        <span class="card-title">Notification History</span>
+                    </div>
+
+                    <div class="analytics-toolbar">
+                        <label>
+                            Status
+                            <select id="notification-status-filter">
+                                <option value="">All statuses</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="SENT">Sent</option>
+                                <option value="FAILED">Failed</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Channel
+                            <select id="notification-channel-filter">
+                                <option value="">All channels</option>
+                                <option value="SMS">SMS</option>
+                                <option value="EMAIL">Email</option>
+                                <option value="DASHBOARD">Dashboard</option>
+                            </select>
+                        </label>
+
+                        <button type="button"
+                                class="btn"
+                                id="notification-history-refresh">
+                            Load History
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="notification-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Alert</th>
+                                    <th>Severity</th>
+                                    <th>Event</th>
+                                    <th>Channel</th>
+                                    <th>Status</th>
+                                    <th>Attempt</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="notification-history-body">
+                                <tr>
+                                    <td colspan="8">
+                                        Notification history will appear here.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </section>
 
     </div>
@@ -1562,6 +1976,269 @@
                 });
 
             fetchAnalytics();
+
+            // ==========================================
+            // Alerting & Notification Management
+            // ==========================================
+
+            const alertRulesBody = document.getElementById('alert-rules-body');
+            const notificationHistoryBody =
+                document.getElementById('notification-history-body');
+            const alertsMessage = document.getElementById('alerts-message');
+
+            const csrfToken =
+                document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+            async function alertApiRequest(url, options = {}) {
+                const headers = {
+                    ...(options.headers || {}),
+                    'X-CSRFToken': csrfToken
+                };
+
+                if (options.body) {
+                    headers['Content-Type'] = 'application/json';
+                }
+
+                const response = await fetch(url, {
+                    ...options,
+                    headers,
+                    credentials: 'same-origin'
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (_) {
+                    data = {};
+                }
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Request failed (${response.status})`);
+                }
+
+                return data;
+            }
+
+            function addBadgeCell(row, value, type) {
+                const cell = document.createElement('td');
+                const badge = document.createElement('span');
+                const normalized = String(value || '').toUpperCase();
+
+                badge.className = `status-badge status-${type}-${normalized.toLowerCase()}`;
+                badge.textContent = value ?? '—';
+
+                cell.appendChild(badge);
+                row.appendChild(cell);
+                return cell;
+            }
+
+            function addTableCell(row, value) {
+                const cell = document.createElement('td');
+                cell.textContent = value ?? '—';
+                row.appendChild(cell);
+                return cell;
+            }
+
+            function showAlertMessage(message, isError = false) {
+                alertsMessage.textContent = message;
+                alertsMessage.style.color = isError ? '#ef4444' : '';
+            }
+
+            async function loadAlertRules() {
+                alertRulesBody.replaceChildren();
+
+                try {
+                    const data = await alertApiRequest('/api/alerts/rules');
+
+                    if (!data.rules || data.rules.length === 0) {
+                        const row = document.createElement('tr');
+                        const cell = addTableCell(row, 'No alert rules configured.');
+                        cell.colSpan = 6;
+                        alertRulesBody.appendChild(row);
+                        return;
+                    }
+
+                    data.rules.forEach(rule => {
+                        const row = document.createElement('tr');
+
+                        addTableCell(row, rule.name);
+                        addTableCell(row, rule.event_type);
+                        if (rule.min_severity) {
+                            addBadgeCell(row, rule.min_severity, 'severity');
+                        } else {
+                            addTableCell(row, 'Any');
+                        }
+
+                        addTableCell(row, `${rule.cooldown_seconds}s`);
+                        addBadgeCell(
+                            row,
+                            rule.enabled ? 'Enabled' : 'Disabled',
+                            'rule'
+                        );
+
+                        const actionCell = document.createElement('td');
+                        const toggleButton = document.createElement('button');
+
+                        toggleButton.type = 'button';
+                        toggleButton.className = 'btn';
+                        toggleButton.textContent = rule.enabled ? 'Disable' : 'Enable';
+
+                        toggleButton.addEventListener('click', async () => {
+                            toggleButton.disabled = true;
+
+                            try {
+                                await alertApiRequest(
+                                    `/api/alerts/rules/${rule.id}`,
+                                    {
+                                        method: 'PATCH',
+                                        body: JSON.stringify({
+                                            enabled: !rule.enabled
+                                        })
+                                    }
+                                );
+
+                                showAlertMessage(
+                                    `Rule "${rule.name}" ${rule.enabled ? 'disabled' : 'enabled'}.`
+                                );
+
+                                await loadAlertRules();
+                            } catch (error) {
+                                showAlertMessage(error.message, true);
+                                toggleButton.disabled = false;
+                            }
+                        });
+
+                        actionCell.appendChild(toggleButton);
+                        row.appendChild(actionCell);
+                        alertRulesBody.appendChild(row);
+                    });
+                } catch (error) {
+                    const row = document.createElement('tr');
+                    const cell = addTableCell(row, error.message);
+                    cell.colSpan = 6;
+                    alertRulesBody.appendChild(row);
+                    showAlertMessage('Could not load alert rules.', true);
+                }
+            }
+
+            async function loadNotificationHistory() {
+                notificationHistoryBody.replaceChildren();
+
+                const params = new URLSearchParams();
+                const status =
+                    document.getElementById('notification-status-filter').value;
+                const channel =
+                    document.getElementById('notification-channel-filter').value;
+
+                if (status) params.set('status', status);
+                if (channel) params.set('channel', channel);
+                params.set('limit', '50');
+
+                try {
+                    const data = await alertApiRequest(
+                        `/api/alerts/history?${params.toString()}`
+                    );
+
+                    if (!data.deliveries || data.deliveries.length === 0) {
+                        const row = document.createElement('tr');
+                        const cell = addTableCell(row, 'No notification attempts found.');
+                        cell.colSpan = 8;
+                        notificationHistoryBody.appendChild(row);
+                        return;
+                    }
+
+                    data.deliveries.forEach(delivery => {
+                        const row = document.createElement('tr');
+                        const alert = delivery.alert || {};
+
+                        const attemptedAt = delivery.attempted_at
+                            ? new Date(delivery.attempted_at).toLocaleString()
+                            : '—';
+
+                        addTableCell(row, attemptedAt);
+                        addTableCell(row, alert.title || alert.alert_ref || 'Alert');
+                        if (alert.severity) {
+                            addBadgeCell(row, alert.severity, 'severity');
+                        } else {
+                            addTableCell(row, '—');
+                        }
+                        addTableCell(row, alert.event_type || '—');
+                        addTableCell(row, delivery.channel);
+                        addBadgeCell(row, delivery.status, 'delivery');
+                        addTableCell(row, delivery.attempt_number);
+
+                        const details = delivery.error_message
+                            || delivery.provider_message_id
+                            || '—';
+
+                        addTableCell(row, details);
+                        notificationHistoryBody.appendChild(row);
+                    });
+                } catch (error) {
+                    const row = document.createElement('tr');
+                    const cell = addTableCell(row, error.message);
+                    cell.colSpan = 8;
+                    notificationHistoryBody.appendChild(row);
+                    showAlertMessage('Could not load notification history.', true);
+                }
+            }
+
+            document.getElementById('alert-rule-form')
+                .addEventListener('submit', async event => {
+                    event.preventDefault();
+
+                    const createButton =
+                        document.getElementById('alert-rule-create');
+                    createButton.disabled = true;
+
+                    const rule = {
+                        rule_key: document.getElementById('alert-rule-key').value.trim(),
+                        name: document.getElementById('alert-rule-name').value.trim(),
+                        event_type: document.getElementById('alert-rule-event').value.trim(),
+                        min_severity:
+                            document.getElementById('alert-rule-severity').value || null,
+                        cooldown_seconds: Number(
+                            document.getElementById('alert-rule-cooldown').value
+                        ),
+                        enabled: true
+                    };
+
+                    try {
+                        await alertApiRequest('/api/alerts/rules', {
+                            method: 'POST',
+                            body: JSON.stringify(rule)
+                        });
+
+                        event.target.reset();
+                        document.getElementById('alert-rule-cooldown').value = 300;
+
+                        showAlertMessage('Alert rule created successfully.');
+                        await loadAlertRules();
+                    } catch (error) {
+                        showAlertMessage(error.message, true);
+                    } finally {
+                        createButton.disabled = false;
+                    }
+                });
+
+            document.getElementById('alerts-refresh')
+                .addEventListener('click', async () => {
+                    await loadAlertRules();
+                    await loadNotificationHistory();
+                });
+
+            document.getElementById('notification-history-refresh')
+                .addEventListener('click', loadNotificationHistory);
+
+            document.getElementById('notification-status-filter')
+                .addEventListener('change', loadNotificationHistory);
+
+            document.getElementById('notification-channel-filter')
+                .addEventListener('change', loadNotificationHistory);
+
+            loadAlertRules();
+            loadNotificationHistory();
+
 
     </script>
 
