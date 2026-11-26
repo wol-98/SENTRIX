@@ -1,342 +1,1570 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
     <title>SENTRIX</title>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
+
         :root {
+
             --bg-color: #0f172a;
+
             --card-bg: #1e293b;
+
             --text-primary: #f8fafc;
+
             --text-secondary: #94a3b8;
+
             --accent-safe: #10b981;
+
             --accent-danger: #ef4444;
+
             --accent-warn: #f59e0b;
+
             --neon-blue: #3b82f6;
+
             --toggle-off: #475569;
+
         }
 
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-color); color: var(--text-primary); margin: 0; padding: 15px; }
 
-        /* HEADER */
+/* HEADER */*
+
         .header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px; position: relative; }
+
         .connection-status { position: absolute; top: 5px; right: 0; font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 5px 10px; border-radius: 20px; border: 1px solid #334155; }
+
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-secondary); }
+
         .status-online { background-color: var(--accent-safe); box-shadow: 0 0 8px var(--accent-safe); animation: pulse-green 2s infinite; }
+
         .status-offline { background-color: var(--accent-danger); }
-        @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        @keyframes *pulse-green* { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
         h1 { font-family: 'Roboto Mono', monospace; font-size: 1.6rem; margin: 0; letter-spacing: -1px; line-height: 1.2; }
+
         .subtitle { color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px; }
 
+/* DASHBOARD HEADER ACTIONS */*
 
-        /* DASHBOARD HEADER ACTIONS */
         .header-actions {
+
             display: flex;
+
             justify-content: center;
+
             align-items: center;
+
             flex-wrap: wrap;
+
             gap: 10px;
+
             margin-top: 15px;
+
         }
 
         .header-action {
+
             display: inline-flex;
+
             align-items: center;
+
             justify-content: center;
+
             gap: 8px;
+
             padding: 9px 16px;
+
             border: 1px solid #334155;
+
             border-radius: 6px;
+
             background: var(--card-bg);
+
             color: var(--text-secondary);
+
             font-family: 'Inter', sans-serif;
+
             font-size: 0.85rem;
+
             text-decoration: none;
+
             cursor: pointer;
+
             transition: all 0.2s ease;
+
         }
 
         .header-action:hover {
+
             border-color: var(--neon-blue);
+
             color: var(--text-primary);
+
             background: rgba(59, 130, 246, 0.08);
+
         }
 
         .header-action:focus-visible {
+
             outline: 2px solid var(--neon-blue);
+
             outline-offset: 3px;
+
         }
 
         .header-action.primary {
+
             background: var(--neon-blue);
+
             border-color: var(--neon-blue);
+
             color: #ffffff;
+
         }
 
         .header-action.primary:hover {
+
             background: #2563eb;
+
             border-color: #2563eb;
+
         }
 
-        /* ALERT BANNER */
+/* ALERT BANNER */*
+
         #alert-box { padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: 700; text-align: center; font-family: 'Roboto Mono', monospace; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 0.5px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
+
         .safe-state { background-color: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-safe); color: var(--accent-safe); }
+
         .danger-state { background-color: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-danger); color: var(--accent-danger); animation: pulse 1.5s infinite; }
+
         .sensor-warning { background-color: rgba(245, 158, 11, 0.15); border: 1px solid var(--accent-warn); color: var(--accent-warn); }
 
-        /* GRID LAYOUT */
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
+/* GRID LAYOUT */*
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; align-items: stretch; }
+
         .card { background-color: var(--card-bg); border-radius: 12px; padding: 20px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; }
+
         .card-header { display: flex; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+
         .card-header i { font-size: 1.3rem; margin-right: 12px; }
+
         .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
 
-        /* METRICS BOXES */
+/* METRICS BOXES */*
+
         .metrics-row { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px; }
+
         .metric-item { text-align: center; background: #0f172a; padding: 15px 5px; border-radius: 8px; flex: 1; }
+
         .metric-label { display: block; color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+
         .metric-value { font-family: 'Roboto Mono', monospace; font-size: 1.2rem; font-weight: 700; }
+
         .sensor-health { display: flex; align-items: center; gap: 8px; margin: -3px 0 14px; color: var(--text-secondary); font-size: 0.75rem; font-family: 'Roboto Mono', monospace; }
+
         .sensor-health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-danger); }
+
         .sensor-live .sensor-health-dot { background: var(--accent-safe); box-shadow: 0 0 7px var(--accent-safe); }
+
         .sensor-stale .sensor-health-dot { background: var(--accent-warn); }
 
-        /* AI BOX */
+/* AI BOX */*
+
         .ai-box { background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 3px solid var(--neon-blue); font-size: 0.85rem; line-height: 1.4; display: flex; align-items: center; }
+
         .chart-container { position: relative; width: 100%; flex-grow: 1; min-height: 200px; }
 
-        /* --- CONTROL SWITCHES --- */
+/* --- CONTROL SWITCHES --- */*
+
         .control-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: #0f172a; padding: 12px; border-radius: 8px; }
+
         .control-label { font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+
         .status-badge { font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: var(--toggle-off); color: #cbd5e1; transition: 0.3s; }
+
         .active-red { background: var(--accent-danger); color: white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+
         .active-green { background: var(--accent-safe); color: white; }
 
-        /* DESKTOP OVERRIDES */
+/* DESKTOP OVERRIDES */*
+
         @media (min-width: 768px) {
+
             body { padding: 30px; }
+
             h1 { font-size: 2.5rem; }
+
             .connection-status { top: 10px; font-size: 0.9rem; padding: 8px 15px; }
+
             .card { padding: 25px; }
+
             .card-title { font-size: 1.3rem; }
+
             .metric-value { font-size: 1.6rem; }
+
             .chart-container { min-height: 260px; }
+
         }
+
+/* SECURITY ANALYTICS */*
+
+        .analytics-section {
+
+            max-width: 1400px;
+
+            margin: 30px auto 0;
+
+        }
+
+        .analytics-toolbar {
+
+            display: flex;
+
+            flex-wrap: wrap;
+
+            align-items: end;
+
+            gap: 12px;
+
+            margin-bottom: 20px;
+
+            padding: 16px;
+
+            background: var(--card-bg);
+
+            border: 1px solid #334155;
+
+            border-radius: 10px;
+
+        }
+
+        .analytics-field {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 6px;
+
+            color: var(--text-secondary);
+
+            font-size: 0.75rem;
+
+        }
+
+        .analytics-field select,
+
+        .analytics-field input,
+
+        .analytics-toolbar button {
+
+            padding: 9px 12px;
+
+            border: 1px solid #334155;
+
+            border-radius: 6px;
+
+            background: #0f172a;
+
+            color: var(--text-primary);
+
+            font: inherit;
+
+        }
+
+        .analytics-toolbar button {
+
+            cursor: pointer;
+
+            background: var(--neon-blue);
+
+            border-color: var(--neon-blue);
+        }
+        .analytics-toolbar button.secondary { background: #334155; border-color: #475569; }
+
+        .analytics-metrics {
+
+            display: grid;
+
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+
+            gap: 14px;
+
+            margin-bottom: 20px;
+
+        }
+
+        .analytics-metric {
+
+            background: var(--card-bg);
+
+            border: 1px solid #334155;
+
+            border-radius: 10px;
+
+            padding: 18px;
+
+        }
+
+        .analytics-metric .metric-label {
+
+            text-align: left;
+
+        }
+
+        .analytics-metric .metric-value {
+
+            display: block;
+
+            margin-top: 8px;
+
+            font-size: 1.7rem;
+
+        }
+
+        .analytics-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr); gap: 20px; align-items: stretch; }
+        .analytics-grid > .card { min-width: 0; }
+        .analytics-grid > .card:last-child { grid-column: 1 / -1; }
+        .analytics-grid .chart-container { height: 290px; min-height: 0; flex: none; }
+
+        .analytics-grid .card {
+
+            min-height: 300px;
+
+        }
+
+        .analytics-message {
+
+            color: var(--text-secondary);
+
+            font-size: 0.85rem;
+
+            margin: 10px 0;
+
+        }
+
+
+        @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 760px) {
+            body { padding: 12px; }
+            .dashboard-grid, .analytics-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+            .analytics-grid > .card:last-child { grid-column: auto; }
+            .analytics-toolbar { padding: 12px; gap: 10px; }
+            .analytics-field { flex: 1 1 calc(50% - 10px); min-width: 0; }
+            .analytics-toolbar button { flex: 1 1 100%; }
+            .analytics-grid .chart-container { height: 260px; }
+            .analytics-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .analytics-metric { padding: 14px; }
+            .analytics-metric .metric-value { font-size: 1.35rem; }
+        }
+        @media (max-width: 420px) { .analytics-field { flex-basis: 100%; } .header-actions { flex-direction: column; } }
     </style>
+
 </head>
+
 <body>
 
     <div class="header">
+
        <h1><i class="fa-solid fa-shield-halved" style="color: var(--neon-blue);"></i> SENTRIX</h1>
+
        <div class="subtitle">Integrated IT/OT Security Operations Center</div>
-        
+
         <div class="connection-status">
+
             <span id="conn-text">CONNECTING</span>
+
             <div id="conn-dot" class="status-dot"></div>
+
         </div>
+
         <div class="header-actions">
+
             <a href="/incidents" class="header-action">
+
                 <i class="fa-solid fa-list-check"></i>
+
                 Incident Console
+
             </a>
 
             <a href="/api/report" class="header-action primary">
+
                 <i class="fa-solid fa-file-pdf"></i>
+
                 Download Security Audit
+
             </a>
+
         </div>
+
     </div>
 
     <div class="container">
+
         <div id="alert-box" class="safe-state">
+
             <i class="fa-solid fa-check-circle"></i> SYSTEM STATUS: SECURE
+
         </div>
 
         <div class="dashboard-grid">
-            
+
             <div class="card" style="border-top: 4px solid var(--accent-warn);">
+
                 <div class="card-header">
+
                     <i class="fa-solid fa-temperature-high" style="color: var(--accent-warn);"></i>
+
                     <span class="card-title">Environment</span>
+
                 </div>
+
                 <div id="sensor-health" class="sensor-health sensor-offline">
+
                     <span class="sensor-health-dot"></span>
+
                     <span id="sensor-health-text">SENSOR OFFLINE</span>
+
                 </div>
+
                 <div class="metrics-row">
+
                     <div class="metric-item"><span class="metric-label">TEMP</span><span class="metric-value" style="color: var(--accent-warn);"><span id="temp">--</span>°C</span></div>
+
                     <div class="metric-item"><span class="metric-label">GAS</span><span class="metric-value" id="gas">--</span></div>
+
                     <div class="metric-item"><span class="metric-label">MOTION</span><span class="metric-value" id="motion">--</span></div>
+
                 </div>
+
                 <div class="ai-box">
+
                     <span style="color: var(--text-secondary); margin-right: 8px;"><i class="fa-solid fa-robot"></i> AI PRED:</span>
+
                     <span id="ml-pred" style="font-weight: bold; color: var(--text-primary);">Initializing...</span>
+
                 </div>
+
                 <div class="chart-container"><canvas id="tempChart"></canvas></div>
+
             </div>
 
             <div class="card" style="border-top: 4px solid var(--neon-blue);">
+
                 <div class="card-header">
+
                     <i class="fa-solid fa-network-wired" style="color: var(--neon-blue);"></i>
+
                     <span class="card-title">Network</span>
+
                 </div>
+
                 <div class="metrics-row">
+
                     <div class="metric-item"><span class="metric-label">CPU</span><span class="metric-value" style="color: var(--neon-blue);"><span id="cpu">--</span>%</span></div>
+
                     <div class="metric-item"><span class="metric-label">RAM</span><span class="metric-value" id="ram">--</span>%</div>
+
                     <div class="metric-item"><span class="metric-label">THREAT</span><span class="metric-value" id="threat">LOW</span></div>
+
                 </div>
+
                 <div class="chart-container"><canvas id="cpuChart"></canvas></div>
+
             </div>
 
             <div class="card" style="border-top: 4px solid var(--accent-danger);">
+
                 <div class="card-header">
+
                     <i class="fa-solid fa-tower-broadcast" style="color: var(--accent-danger);"></i>
+
                     <span class="card-title">Active Countermeasures</span>
+
                 </div>
-                
+
                 <div class="control-row">
+
                     <div class="control-label"><i class="fa-solid fa-faucet-drip"></i> Sprinkler System</div>
+
                     <span id="stat-sprinkler" class="status-badge">STANDBY</span>
+
                 </div>
 
                 <div class="control-row">
+
                     <div class="control-label"><i class="fa-solid fa-bell"></i> Emergency Alarm</div>
+
                     <span id="stat-alarm" class="status-badge">SILENT</span>
+
                 </div>
 
                 <div class="control-row">
+
                     <div class="control-label"><i class="fa-solid fa-door-open"></i> Door Locks</div>
+
                     <span id="stat-door" class="status-badge active-green">LOCKED</span>
+
                 </div>
 
                 <div class="control-row" style="margin-bottom: 0;">
+
                     <div class="control-label"><i class="fa-solid fa-shield-virus"></i> Firewall Rules</div>
+
                     <span id="stat-firewall" class="status-badge active-green">STANDARD</span>
+
                 </div>
+
             </div>
 
         </div>
+
+            <section class="analytics-section">
+
+                <div class="card-header">
+
+                    <i class="fa-solid fa-chart-line"
+
+                    style="color: var(--neon-blue);"></i>
+
+                    <span class="card-title">Security Analytics & Trends</span>
+
+                </div>
+
+                <div class="analytics-toolbar">
+
+                    <label class="analytics-field">
+
+                        Period
+
+                        <select id="analytics-period">
+
+                            <option value="24h">Last 24 hours</option>
+
+                            <option value="7d" selected>Last 7 days</option>
+
+                            <option value="30d">Last 30 days</option>
+
+                            <option value="custom">Custom range</option>
+
+                        </select>
+
+                    </label>
+
+                    <label class="analytics-field">
+
+                        Start date
+
+                        <input type="date" id="analytics-start">
+
+                    </label>
+
+                    <label class="analytics-field">
+
+                        End date
+
+                        <input type="date" id="analytics-end">
+
+                    </label>
+
+                    <label class="analytics-field">
+
+                        Severity
+
+                        <select id="analytics-severity">
+
+                            <option value="">All severities</option>
+
+                            <option value="CRITICAL">Critical</option>
+
+                            <option value="HIGH">High</option>
+
+                            <option value="MEDIUM">Medium</option>
+
+                            <option value="LOW">Low</option>
+
+                        </select>
+
+                    </label>
+
+                    <label class="analytics-field">
+
+                        Status
+
+                        <select id="analytics-status">
+
+                            <option value="">All statuses</option>
+
+                            <option value="OPEN">Open</option>
+
+                            <option value="ACKNOWLEDGED">Acknowledged</option>
+
+                            <option value="RESOLVED">Resolved</option>
+
+                        </select>
+
+                    </label>
+
+                    <label class="analytics-field">
+                        Event type
+                        <select id="analytics-event-type"><option value="">All event types</option></select>
+                    </label>
+
+                    <button type="button" id="analytics-apply">
+
+                        <i class="fa-solid fa-filter"></i> Apply
+
+                    </button>
+
+                    <button type="button" id="analytics-export" class="secondary"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+
+                </div>
+
+                <p id="analytics-message" class="analytics-message">
+
+                    Loading security analytics...
+
+                </p>
+
+                <div class="analytics-metrics">
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">Total Incidents</span>
+
+                        <span id="analytics-total" class="metric-value">--</span>
+
+                    </div>
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">Open</span>
+
+                        <span id="analytics-open" class="metric-value">--</span>
+
+                    </div>
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">Acknowledged</span>
+
+                        <span id="analytics-acknowledged" class="metric-value">--</span>
+
+                    </div>
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">Resolved</span>
+
+                        <span id="analytics-resolved" class="metric-value">--</span>
+
+                    </div>
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">MTTA (min)</span>
+
+                        <span id="analytics-mtta" class="metric-value">--</span>
+
+                    </div>
+
+                    <div class="analytics-metric">
+
+                        <span class="metric-label">MTTR (min)</span>
+
+                        <span id="analytics-mttr" class="metric-value">--</span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="card" style="grid-column: 1 / -1; margin-bottom: 20px;">
+                    <div class="card-header">
+                        <span class="card-title">
+                            <i class="fa-solid fa-microchip"
+                            style="color: var(--neon-blue);"></i>
+                            Sensor Health Analytics
+                        </span>
+                        <span id="sensor-analytics-status"
+                            class="status-badge">
+                            Loading...
+                        </span>
+                    </div>
+
+                    <div class="analytics-metrics">
+                        <div class="analytics-metric">
+                            <span class="metric-label">Uptime</span>
+                            <span id="sensor-analytics-uptime"
+                                class="metric-value">--</span>
+                        </div>
+
+                        <div class="analytics-metric">
+                            <span class="metric-label">Offline Duration</span>
+                            <span id="sensor-analytics-offline"
+                                class="metric-value">--</span>
+                        </div>
+
+                        <div class="analytics-metric">
+                            <span class="metric-label">Outages</span>
+                            <span id="sensor-analytics-outages"
+                                class="metric-value">--</span>
+                        </div>
+
+                        <div class="analytics-metric">
+                            <span class="metric-label">Current Outage</span>
+                            <span id="sensor-analytics-current-outage"
+                                class="metric-value">--</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <div class="card-header">
+                            <span class="card-title">Sensor Status History</span>
+                        </div>
+
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align: left; padding: 10px;">
+                                            Status
+                                        </th>
+                                        <th style="text-align: left; padding: 10px;">
+                                            Effective Time
+                                        </th>
+                                        <th style="text-align: left; padding: 10px;">
+                                            Last Telemetry
+                                        </th>
+                                        <th style="text-align: left; padding: 10px;">
+                                            Sensor Age
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sensor-analytics-history">
+                                    <tr>
+                                        <td colspan="4" style="padding: 12px;">
+                                            Loading sensor history...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="analytics-grid">
+
+                    <div class="card">
+
+                        <div class="card-header">
+
+                            <span class="card-title">Incident Trends</span>
+
+                        </div>
+
+                        <div class="chart-container">
+
+                            <canvas id="incident-trend-chart"></canvas>
+
+                        </div>
+
+                    </div>
+
+                    <div class="card">
+
+                        <div class="card-header">
+
+                            <span class="card-title">Severity Distribution</span>
+
+                        </div>
+
+                        <div class="chart-container">
+
+                            <canvas id="incident-severity-chart"></canvas>
+
+                        </div>
+
+                    </div>
+
+                    <div class="card">
+
+                        <div class="card-header">
+
+                            <span class="card-title">Frequent Event Types</span>
+
+                        </div>
+
+                        <div class="chart-container">
+
+                            <canvas id="incident-event-chart"></canvas>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
     </div>
 
     <script>
+
         Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = '#334155'; Chart.defaults.font.family = "'Roboto Mono', monospace";
+
         const ctxTemp = document.getElementById('tempChart').getContext('2d');
+
         const ctxCpu = document.getElementById('cpuChart').getContext('2d');
+
         const gradientTemp = ctxTemp.createLinearGradient(0, 0, 0, 400); gradientTemp.addColorStop(0, 'rgba(245, 158, 11, 0.5)'); gradientTemp.addColorStop(1, 'rgba(245, 158, 11, 0)');
+
         const gradientCpu = ctxCpu.createLinearGradient(0, 0, 0, 400); gradientCpu.addColorStop(0, 'rgba(59, 130, 246, 0.5)'); gradientCpu.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
         const commonOptions = { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { font: { size: 10 } } }, x: { grid: { display: false }, ticks: { display: false } } }, plugins: { legend: { display: false } } };
+
         const tempChart = new Chart(ctxTemp, { type: 'line', data: { labels: [], datasets: [{ label: 'Temp', borderColor: '#f59e0b', backgroundColor: gradientTemp, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: false, grid: { color: '#334155' } }, x: { display: false } } } });
+
         const cpuChart = new Chart(ctxCpu, { type: 'line', data: { labels: [], datasets: [{ label: 'CPU', borderColor: '#3b82f6', backgroundColor: gradientCpu, borderWidth: 2, fill: true, tension: 0.4, data: [] }] }, options: { ...commonOptions, scales: { y: { beginAtZero: true, max: 100 }, x: { display: false } } } });
 
         let lastTemperatureEpoch = null;
 
         async function fetchData() {
+
             try {
+
                 const response = await fetch('/api/monitor');
+
                 if (!response.ok) throw new Error("Server Error");
+
                 const data = await response.json();
 
                 document.getElementById('conn-text').innerText = "MONITOR ONLINE"; document.getElementById('conn-dot').className = "status-dot status-online";
 
                 const sensorHealth = data.sensor_health || { status: "OFFLINE" };
+
                 const healthStatus = sensorHealth.status || "OFFLINE";
+
                 const healthElement = document.getElementById('sensor-health');
+
                 healthElement.className = "sensor-health sensor-" + healthStatus.toLowerCase();
+
                 document.getElementById('sensor-health-text').innerText =
+
                     "SENSOR " + healthStatus +
+
                     (sensorHealth.age_seconds != null ? " · " + sensorHealth.age_seconds + "s ago" : "");
 
                 const sensorLive = healthStatus === "LIVE";
+
                 document.getElementById('temp').innerText = sensorLive ? data.iot_metrics.temperature : "--";
+
                 document.getElementById('gas').innerText = sensorLive ? data.iot_metrics.gas_level : "--";
 
                 const mot = document.getElementById('motion');
+
                 if (!sensorLive) {
+
                     mot.innerText = "--";
+
                 } else if(data.iot_metrics.motion == 1) {
+
                     mot.innerHTML = "<span style='color:#ef4444'>DETECTED</span>";
+
                 } else {
+
                     mot.innerHTML = "<span style='color:#10b981'>NONE</span>";
+
                 }
 
                 document.getElementById('cpu').innerText = data.security_metrics.cpu_usage;
+
                 document.getElementById('ram').innerText = data.security_metrics.ram_usage;
+
                 document.getElementById('threat').innerText = data.security_metrics.alert_status.includes("SAFE") ? "LOW" : "HIGH";
+
                 document.getElementById('ml-pred').innerText = data.security_metrics.ml_prediction;
 
-                // --- UPDATE ACTIVE DEFENSE PANEL ---
+// --- UPDATE ACTIVE DEFENSE PANEL ---
                 const controls = data.system_controls;
-                
-                // Sprinklers
+
+// Sprinklers
                 const spk = document.getElementById('stat-sprinkler');
+
                 if (controls.sprinklers) { spk.innerText = "ACTIVE"; spk.className = "status-badge active-green"; }
+
                 else { spk.innerText = "STANDBY"; spk.className = "status-badge"; }
 
-                // Alarm
+// Alarm
                 const alm = document.getElementById('stat-alarm');
+
                 if (controls.alarm) { alm.innerText = "RINGING"; alm.className = "status-badge active-red"; }
+
                 else { alm.innerText = "SILENT"; alm.className = "status-badge"; }
 
-                // Door Locks
+// Door Locks
                 const door = document.getElementById('stat-door');
+
                 if (!controls.door_lock) { door.innerText = "UNLOCKED"; door.className = "status-badge active-red"; } // Red because unlocked is danger/evacuation
+
                 else { door.innerText = "LOCKED"; door.className = "status-badge active-green"; }
 
-                // Firewall
+// Firewall
                 const fw = document.getElementById('stat-firewall');
+
                 if (controls.firewall.includes("BLOCKING")) { fw.innerText = "LOCKDOWN"; fw.className = "status-badge active-red"; }
+
                 else { fw.innerText = "STANDARD"; fw.className = "status-badge active-green"; }
 
-                // Update Graphs
+// Update Graphs
                 const timeNow = new Date().toLocaleTimeString();
+
                 const readingEpoch = data.iot_metrics.last_update_epoch;
+
                 if (sensorLive && readingEpoch != null && readingEpoch !== lastTemperatureEpoch) {
+
                     if(tempChart.data.labels.length > 20) tempChart.data.labels.shift();
+
                     if(tempChart.data.datasets[0].data.length > 20) tempChart.data.datasets[0].data.shift();
+
                     tempChart.data.labels.push(data.iot_metrics.last_update || timeNow);
+
                     tempChart.data.datasets[0].data.push(data.iot_metrics.temperature);
+
                     lastTemperatureEpoch = readingEpoch;
+
                     tempChart.update();
+
                 }
+
                 if(cpuChart.data.labels.length > 20) cpuChart.data.labels.shift(); cpuChart.data.labels.push(timeNow);
+
                 if(cpuChart.data.datasets[0].data.length > 20) cpuChart.data.datasets[0].data.shift(); cpuChart.data.datasets[0].data.push(data.security_metrics.cpu_usage); cpuChart.update();
 
-                // Alert Logic
+// Alert Logic
                 const alertBox = document.getElementById('alert-box');
+
                 const rawStatus = data.security_metrics.alert_status;
 
                 if (rawStatus.includes("SAFE") && healthStatus !== "LIVE") {
+
                     alertBox.className = "sensor-warning";
+
                     alertBox.innerHTML =
+
                         '<i class="fa-solid fa-triangle-exclamation"></i> ' +
+
                         `SENSOR ${healthStatus} — SECURITY MONITORING ACTIVE`;
+
                 } else if (rawStatus.includes("SAFE")) {
+
                     alertBox.className = "safe-state";
+
                     alertBox.innerHTML =
+
                         '<i class="fa-solid fa-check-circle"></i> SYSTEM STATUS: SECURE';
+
                 } else {
+
                     alertBox.className = "danger-state";
 
                     let icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+
                     if (rawStatus.includes("FIRE")) {
+
                         icon = '<i class="fa-solid fa-fire"></i>';
+
                     }
+
                     if (rawStatus.includes("DDoS")) {
+
                         icon = '<i class="fa-solid fa-shield-virus"></i>';
+
                     }
 
                     alertBox.innerHTML = `${icon} ${rawStatus}`;
+
                 }
 
             } catch (error) { console.error("Error:", error); document.getElementById('conn-text').innerText = "DISCONNECTED"; document.getElementById('conn-dot').className = "status-dot status-offline"; }
+
         }
+
         setInterval(fetchData, 1000); 
+
+// --- SECURITY ANALYTICS ---
+            const analyticsTrendChart = new Chart(
+
+                document.getElementById('incident-trend-chart'),
+
+                {
+
+                    type: 'line',
+
+                    data: {
+
+                        labels: [],
+
+                        datasets: [{
+
+                            label: 'Incidents',
+
+                            data: [],
+
+                            borderColor: '#3b82f6',
+
+                            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+
+                            fill: true,
+
+                            tension: 0.3
+
+                        }]
+
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false,
+
+                        scales: {
+
+                            y: {
+
+                                beginAtZero: true,
+
+                                ticks: { precision: 0 },
+
+                                grid: { color: '#334155' }
+
+                            },
+
+                            x: { grid: { display: false } }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+            const analyticsSeverityChart = new Chart(
+
+                document.getElementById('incident-severity-chart'),
+
+                {
+
+                    type: 'doughnut',
+
+                    data: {
+
+                        labels: [],
+
+                        datasets: [{
+
+                            data: [],
+
+                            backgroundColor: [
+
+                                '#ef4444',
+
+                                '#f97316',
+
+                                '#f59e0b',
+
+                                '#3b82f6'
+
+                            ]
+
+                        }]
+
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false
+
+                    }
+
+                }
+
+            );
+
+            const analyticsEventChart = new Chart(
+
+                document.getElementById('incident-event-chart'),
+
+                {
+
+                    type: 'bar',
+
+                    data: {
+
+                        labels: [],
+
+                        datasets: [{
+
+                            label: 'Incidents',
+
+                            data: [],
+
+                            backgroundColor: '#3b82f6'
+
+                        }]
+
+                    },
+
+                    options: {
+
+                        responsive: true,
+
+                        maintainAspectRatio: false,
+
+                        indexAxis: 'y',
+
+                        scales: {
+
+                            x: {
+
+                                beginAtZero: true,
+
+                                ticks: { precision: 0 },
+
+                                grid: { color: '#334155' }
+
+                            },
+
+                            y: { grid: { display: false } }
+
+                        }
+
+                    }
+
+                }
+
+            );
+
+            function getAnalyticsDateRange() {
+
+                const period = document.getElementById('analytics-period').value;
+
+                const startInput = document.getElementById('analytics-start');
+
+                const endInput = document.getElementById('analytics-end');
+
+                const now = new Date();
+
+                const endDate = new Date(now);
+
+                const startDate = new Date(now);
+
+                if (period === '24h') {
+
+                    startDate.setHours(startDate.getHours() - 24);
+
+                } else if (period === '7d') {
+
+                    startDate.setDate(startDate.getDate() - 7);
+
+                } else if (period === '30d') {
+
+                    startDate.setDate(startDate.getDate() - 30);
+
+                } else {
+
+                    return {
+
+                        start_date: startInput.value,
+
+                        end_date: endInput.value
+
+                    };
+
+                }
+
+                return {
+
+                    start_date: startDate.toISOString().slice(0, 10),
+
+                    end_date: endDate.toISOString().slice(0, 10)
+
+                };
+
+            }
+
+            async function fetchSensorHealthAnalytics(range) {
+    const statusElement = document.getElementById(
+        'sensor-analytics-status'
+    );
+
+    const uptimeElement = document.getElementById(
+        'sensor-analytics-uptime'
+    );
+
+    const offlineElement = document.getElementById(
+        'sensor-analytics-offline'
+    );
+
+    const outagesElement = document.getElementById(
+        'sensor-analytics-outages'
+    );
+
+    const currentOutageElement = document.getElementById(
+        'sensor-analytics-current-outage'
+    );
+
+    const historyElement = document.getElementById(
+        'sensor-analytics-history'
+    );
+
+    function formatDuration(seconds) {
+        if (seconds === null || seconds === undefined) {
+            return 'Unknown';
+        }
+
+        const total = Math.max(0, Math.floor(seconds));
+        const days = Math.floor(total / 86400);
+        const hours = Math.floor((total % 86400) / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+
+        if (days > 0) {
+            return `${days}d ${hours}h ${minutes}m`;
+        }
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+
+        return `${minutes}m`;
+    }
+
+    function formatDate(value) {
+        if (!value) return 'Unknown';
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return 'Unknown';
+        }
+
+        return date.toLocaleString();
+    }
+
+    try {
+        const params = new URLSearchParams();
+
+        if (range.start_date) {
+            params.set('start_date', range.start_date);
+        }
+
+        if (range.end_date) {
+            params.set('end_date', range.end_date);
+        }
+
+        const response = await fetch(
+            `/api/analytics/sensors?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error('Sensor analytics request failed');
+        }
+
+        const data = await response.json();
+
+        statusElement.textContent = data.current_status || 'UNKNOWN';
+
+        uptimeElement.textContent =
+            data.uptime.percentage === null
+                ? 'Unknown'
+                : `${data.uptime.percentage}%`;
+
+        offlineElement.textContent = formatDuration(
+            data.outages.total_offline_seconds
+        );
+
+        outagesElement.textContent = data.outages.count;
+
+        currentOutageElement.textContent =
+            data.outages.ongoing
+                ? formatDuration(data.outages.ongoing_seconds)
+                : 'None';
+
+        historyElement.replaceChildren();
+
+        const history = [...(data.history || [])].reverse().slice(0, 12);
+
+        if (history.length === 0) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+
+            cell.colSpan = 4;
+            cell.style.padding = '12px';
+            cell.textContent = 'No sensor status history for this period.';
+
+            row.appendChild(cell);
+            historyElement.appendChild(row);
+            return;
+        }
+
+        history.forEach(item => {
+            const row = document.createElement('tr');
+
+            const statusCell = document.createElement('td');
+            statusCell.textContent = item.status;
+            statusCell.style.padding = '10px';
+
+            const changedCell = document.createElement('td');
+            changedCell.textContent = formatDate(item.changed_at);
+            changedCell.style.padding = '10px';
+
+            const lastSeenCell = document.createElement('td');
+            lastSeenCell.textContent = formatDate(item.last_seen_at);
+            lastSeenCell.style.padding = '10px';
+
+            const ageCell = document.createElement('td');
+            ageCell.textContent =
+                item.age_seconds === null
+                    ? 'Unknown'
+                    : formatDuration(item.age_seconds);
+            ageCell.style.padding = '10px';
+
+            row.append(
+                statusCell,
+                changedCell,
+                lastSeenCell,
+                ageCell
+            );
+
+            historyElement.appendChild(row);
+        });
+
+    } catch (error) {
+        console.error('Sensor analytics error:', error);
+
+        statusElement.textContent = 'Unavailable';
+        uptimeElement.textContent = '--';
+        offlineElement.textContent = '--';
+        outagesElement.textContent = '--';
+        currentOutageElement.textContent = '--';
+
+        historyElement.replaceChildren();
+
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+
+        cell.colSpan = 4;
+        cell.style.padding = '12px';
+        cell.textContent = 'Unable to load sensor health analytics.';
+
+        row.appendChild(cell);
+        historyElement.appendChild(row);
+    }
+}
+
+            let lastAnalyticsData = null;
+
+            async function fetchAnalytics() {
+
+                const message = document.getElementById('analytics-message');
+
+                message.textContent = 'Loading analytics...';
+
+                const params = new URLSearchParams();
+
+                const range = getAnalyticsDateRange();
+                if (document.getElementById('analytics-period').value === 'custom' &&
+                    (!range.start_date || !range.end_date)) {
+                    message.textContent = 'Choose both dates for a custom range.';
+                    return;
+                }
+                fetchSensorHealthAnalytics(range);
+
+                if (range.start_date) params.set('start_date', range.start_date);
+
+                if (range.end_date) params.set('end_date', range.end_date);
+
+                const severity = document.getElementById('analytics-severity').value;
+
+                const status = document.getElementById('analytics-status').value;
+                const eventType = document.getElementById('analytics-event-type').value;
+
+                if (severity) params.set('severity', severity);
+                if (status) params.set('status', status);
+                if (eventType) params.set('event_type', eventType);
+
+                try {
+
+                    const response = await fetch(
+
+                        `/api/analytics/incidents?${params.toString()}`
+
+                    );
+
+                    if (!response.ok) {
+
+                        throw new Error('Analytics request failed');
+
+                    }
+
+                    const data = await response.json();
+                    lastAnalyticsData = data;
+                    const eventSelect = document.getElementById('analytics-event-type');
+                    const selectedEvent = eventSelect.value;
+                    const knownEvents = Object.keys(data.event_type_counts || {}).sort();
+                    eventSelect.replaceChildren(new Option('All event types', ''));
+                    knownEvents.forEach(type => eventSelect.add(new Option(type, type)));
+                    if (knownEvents.includes(selectedEvent)) eventSelect.value = selectedEvent;
+
+                    document.getElementById('analytics-total').textContent =
+
+                        data.total_incidents;
+
+                    document.getElementById('analytics-open').textContent =
+
+                        data.status_counts.OPEN || 0;
+
+                    document.getElementById('analytics-acknowledged').textContent =
+
+                        data.status_counts.ACKNOWLEDGED || 0;
+
+                    document.getElementById('analytics-resolved').textContent =
+
+                        data.status_counts.RESOLVED || 0;
+
+                    document.getElementById('analytics-mtta').textContent =
+
+                        data.response_performance.mtta_minutes ?? '--';
+
+                    document.getElementById('analytics-mttr').textContent =
+
+                        data.response_performance.mttr_minutes ?? '--';
+
+                    analyticsTrendChart.data.labels =
+
+                        data.daily_trends.map(item => item.date);
+
+                    analyticsTrendChart.data.datasets[0].data =
+
+                        data.daily_trends.map(item => item.count);
+
+                    analyticsTrendChart.update();
+
+                    const severityEntries =
+
+                        Object.entries(data.severity_counts);
+
+                    analyticsSeverityChart.data.labels =
+
+                        severityEntries.map(item => item[0]);
+
+                    analyticsSeverityChart.data.datasets[0].data =
+
+                        severityEntries.map(item => item[1]);
+
+                    analyticsSeverityChart.update();
+
+                    const eventEntries =
+
+                        Object.entries(data.event_type_counts)
+
+                            .sort((a, b) => b[1] - a[1]);
+
+                    analyticsEventChart.data.labels =
+
+                        eventEntries.map(item => item[0]);
+
+                    analyticsEventChart.data.datasets[0].data =
+
+                        eventEntries.map(item => item[1]);
+
+                    analyticsEventChart.update();
+
+                    message.textContent = data.total_incidents === 0
+
+                        ? 'No incidents found for the selected filters.'
+
+                        : 'Analytics updated successfully.';
+
+                } catch (error) {
+
+                    console.error('Analytics error:', error);
+
+                    message.textContent = 'Unable to load analytics.';
+
+                }
+
+            }
+
+            document.getElementById('analytics-event-type')
+                .addEventListener('change', fetchAnalytics);
+
+            document.getElementById('analytics-export')
+                .addEventListener('click', function () {
+                    if (!lastAnalyticsData) return;
+                    const rows = [['category', 'name', 'value']];
+                    const data = lastAnalyticsData;
+                    rows.push(['summary', 'total_incidents', data.total_incidents]);
+                    Object.entries(data.status_counts || {}).forEach(([k, v]) => rows.push(['status', k, v]));
+                    Object.entries(data.severity_counts || {}).forEach(([k, v]) => rows.push(['severity', k, v]));
+                    Object.entries(data.event_type_counts || {}).forEach(([k, v]) => rows.push(['event_type', k, v]));
+                    (data.daily_trends || []).forEach(item => rows.push(['daily_trend', item.date, item.count]));
+                    const rp = data.response_performance || {};
+                    rows.push(['response_performance', 'mtta_minutes', rp.mtta_minutes ?? '']);
+                    rows.push(['response_performance', 'mtta_sample_size', rp.mtta_sample_size ?? 0]);
+                    rows.push(['response_performance', 'mttr_minutes', rp.mttr_minutes ?? '']);
+                    rows.push(['response_performance', 'mttr_sample_size', rp.mttr_sample_size ?? 0]);
+                    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url; link.download = 'sentrix-filtered-analytics.csv'; link.click();
+                    URL.revokeObjectURL(url);
+                });
+
+            document.getElementById('analytics-apply')
+
+                .addEventListener('click', fetchAnalytics);
+
+            document.getElementById('analytics-period')
+
+                .addEventListener('change', function () {
+
+                    const custom = this.value === 'custom';
+
+                    document.getElementById('analytics-start').disabled = !custom;
+
+                    document.getElementById('analytics-end').disabled = !custom;
+
+                });
+
+            fetchAnalytics();
+
     </script>
+
 </body>
+
 </html>
